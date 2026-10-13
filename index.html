@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0e0e" media="(prefers-color-scheme: dark)">
+<title>Global Design Group</title>
+<meta name="description" content="A digital collective of creatives from around the globe. An index of sites shared by our members.">
+<meta property="og:title" content="Global Design Group">
+<meta property="og:description" content="A digital collective of creatives from around the globe. An index of sites shared by our members.">
+<meta property="og:type" content="website">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/ABCAreal-Medium.woff2" as="font" type="font/woff2" crossorigin>
+<script>try{var t=localStorage.getItem('gdg-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<style>
+@font-face{font-family:"ABC Areal";src:url(/fonts/ABCAreal-Medium.woff2) format("woff2");font-weight:500;font-style:normal;font-display:block}
+
+/* Layout: logo, live count and tools; then the sites as a Grid (image cards) or an Index (list);
+   a floating pill dock. Frosted panels: card details (+) and the info panel (Info pill). */
+:root{
+  --ground:#ffffff;
+  --ink:#000000;
+  --muted:#8a8a8a;
+  --surface:#f4f4f4;
+  --rule:#e4e4e4;
+  --pill:rgba(232,232,232,.94);
+  --pill-strong:#000000;
+  --on-strong:#ffffff;
+  --btn:#ffffff;
+  --pill-muted:#6b6b6b;
+  --frost:rgba(222,222,222,.8);
+  --frost-muted:rgba(0,0,0,.5);
+  --media:#000000;
+  --media-ink:#ffffff;
+  --pad:max(16px, 2rem);
+  --gap:max(12px, 1.6rem);
+  --radius:2.6rem;
+  --pill-h:40px;   /* pills */
+  --circle:32px;   /* round + / × buttons */
+  --icon:12px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0e0e0e; --ink:#ffffff; --muted:#8a8a8a; --surface:#1b1b1b; --rule:#262626;
+    --pill:rgba(40,40,40,.94); --pill-strong:#ffffff; --on-strong:#000000; --btn:#000000; --pill-muted:#9a9a9a;
+    --frost:rgba(30,30,30,.8); --frost-muted:rgba(255,255,255,.5); --media:#000000; --media-ink:#ffffff;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0e0e0e; --ink:#ffffff; --muted:#8a8a8a; --surface:#1b1b1b; --rule:#262626;
+  --pill:rgba(40,40,40,.94); --pill-strong:#ffffff; --on-strong:#000000; --btn:#000000; --pill-muted:#9a9a9a;
+  --frost:rgba(30,30,30,.8); --frost-muted:rgba(255,255,255,.5); --media:#000000; --media-ink:#ffffff;
+  color-scheme:dark;
+}
+
+/* One size, 16px everywhere: the rem root is pinned so 2.6rem = 16px (rem spacing stays fixed too). */
+html{
+  font-size:calc(16px / 2.6);
+  background:var(--ground);
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"ABC Areal","Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-weight:500;
+  font-size:2.6rem;
+  line-height:1.08;
+  letter-spacing:-0.022em;
+  font-variant-numeric:tabular-nums;
+  -webkit-font-smoothing:antialiased;
+  padding-block:var(--pad) calc(var(--pad) + var(--pill-h) + 5.2rem + env(safe-area-inset-bottom));
+  padding-inline:max(var(--pad), env(safe-area-inset-left)) max(var(--pad), env(safe-area-inset-right));
+}
+a{color:inherit;text-decoration:none}
+button,input{font:inherit;letter-spacing:inherit;color:inherit;background:none;border:0;border-radius:0;-webkit-appearance:none;appearance:none}
+button{cursor:pointer}
+:focus-visible{outline:1px solid var(--ink);outline-offset:2px}
+.grid12{display:grid;grid-template-columns:repeat(12, minmax(0,1fr));column-gap:var(--gap)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ——— Pills ——— */
+.pill{
+  position:relative;height:var(--pill-h);padding:0 0.9em;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;flex:none;
+  background:var(--pill);color:var(--ink);
+  -webkit-backdrop-filter:blur(16px) saturate(1.2);backdrop-filter:blur(16px) saturate(1.2);
+  touch-action:manipulation;white-space:nowrap;-webkit-tap-highlight-color:transparent;
+}
+.pill::before{content:'';position:absolute;inset:-2px 0}  /* 40px pill, 44px tap area */
+.pill.strong,.pill.on{background:var(--pill-strong);color:var(--on-strong)}
+@media (hover:hover){
+  .pill:hover{background:var(--pill-strong);color:var(--on-strong)}
+  .pill.strong:hover,.pill.on:hover{background:var(--pill);color:var(--ink)}
+  .pill.search:hover{background:var(--pill);color:var(--ink)}
+}
+
+/* ——— Top ——— */
+.top{align-items:start}
+.top .mark{grid-column:1 / span 2;grid-row:1;width:10.4rem;height:auto;display:block;color:var(--ink)}  /* 64px */
+.top .meta-row{grid-column:1 / -1;grid-row:2;margin-top:5.2rem;min-height:1.08em;display:flex;flex-wrap:wrap;justify-content:space-between;gap:0.3em 1em}
+.top .clock .zone{color:var(--muted)}
+.top .stats .n{display:inline-block;min-width:1ch}
+.top .stats .of{color:var(--muted)}
+.top .tools{grid-column:10 / span 3;grid-row:1;display:flex;justify-content:flex-end;gap:max(8px, 0.8rem)}
+
+/* ——— Grid view ——— */
+.cards{margin-top:2.6rem;display:grid;grid-template-columns:1fr;gap:var(--gap)}
+@media (min-width:760px){.cards{grid-template-columns:repeat(2, minmax(0,1fr))}}
+@media (min-width:1200px){.cards{grid-template-columns:repeat(3, minmax(0,1fr))}}
+@media (min-width:3000px){.cards{grid-template-columns:repeat(4, minmax(0,1fr))}}
+
+.card{position:relative;border-radius:var(--radius);overflow:hidden;background:var(--surface);isolation:isolate}
+.hit{display:block;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.media{position:relative;aspect-ratio:16 / 10;background:var(--media);color:var(--media-ink);overflow:hidden}
+.media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+.media img.slide{opacity:0}
+.media img.slide.on{opacity:1}
+/* Shown until the image arrives, and kept if there is none. */
+.fb{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:0.85em 1em}
+.fb .p{color:var(--muted)}
+.cap{display:flex;justify-content:space-between;align-items:baseline;gap:1em;padding:0.86em calc(1.15em + var(--circle)) 0.8em 1em}
+.cap .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cap .p{flex:none;max-width:50%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+@media (hover:hover){
+  .card:hover .cap{background:var(--ink);color:var(--btn)}
+}
+.hit:focus-visible{outline-offset:-3px}
+/* + opens the details panel */
+.more{position:absolute;right:0.55em;bottom:calc((0.86em + 1.08em + 0.8em - var(--circle)) / 2);z-index:3;
+  width:var(--circle);height:var(--circle);border-radius:999px;
+  display:flex;align-items:center;justify-content:center;background:var(--btn);color:var(--ink);
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.more svg,.x svg{width:var(--icon);height:var(--icon);display:block}
+/* Small circles, full-size touch targets (44px minimum). */
+.more::before,.x::before{content:'';position:absolute;inset:-7px}
+@media (hover:hover){ .more:hover{background:var(--ink);color:var(--btn)} }
+/* While its panel is open, the card's own caption steps back so it can't ghost through the frost. */
+.card.open .cap > *,.card.open .more{visibility:hidden}
+
+/* ——— Frosted panels ——— */
+.frost{
+  background:var(--frost);color:var(--ink);
+  -webkit-backdrop-filter:blur(30px) saturate(1.3);backdrop-filter:blur(30px) saturate(1.3);
+}
+.panel{position:absolute;inset:0;z-index:4;border-radius:var(--radius);display:flex;flex-direction:column;justify-content:space-between;padding:0.86em 1em 1em}
+.panel[hidden]{display:none}
+.panel .t{padding-right:calc(var(--circle) + 0.6em)}
+.panel .meta{color:var(--frost-muted);line-height:1.2}
+.panel .foot{display:flex;align-items:flex-end;justify-content:space-between;gap:1em}
+.panel .host{color:var(--frost-muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.x{position:absolute;top:0.55em;right:0.55em;width:var(--circle);height:var(--circle);border-radius:999px;
+  display:flex;align-items:center;justify-content:center;background:var(--btn);color:var(--ink);-webkit-tap-highlight-color:transparent}
+@media (hover:hover){ .x:hover{background:var(--ink);color:var(--btn)} }
+
+.info{position:fixed;z-index:20;
+  left:max(var(--pad), env(safe-area-inset-left));
+  right:max(var(--pad), env(safe-area-inset-right));
+  top:max(var(--pad), env(safe-area-inset-top));
+  bottom:calc(max(var(--pad), env(safe-area-inset-bottom)) + var(--pill-h) + max(8px, 0.8rem));
+  border-radius:var(--radius);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  padding:1.1em calc(1.6em + var(--circle)) 1.4em 1.1em}
+.info[hidden]{display:none}
+.info .copy{max-width:34em;line-height:1.35}
+.info .copy p + p{margin-top:1.35em}
+.info .meta{color:var(--frost-muted)}
+.info .meta .credit{color:var(--ink)}
+.info .x{top:0.8em;right:0.8em}
+/* Desktop: the info spreads across two columns — name on the left, the story and font credit on the right. */
+@media (min-width:760px){
+  .info .copy{max-width:none;display:grid;grid-template-columns:repeat(2, minmax(0,1fr));column-gap:var(--gap);align-items:start}
+  .info .copy > :first-child{grid-column:1;grid-row:1 / span 2}
+  .info .copy > :not(:first-child){grid-column:2;max-width:34em}
+  .info .copy > :nth-child(2){margin-top:0}
+}
+
+/* ——— Index view ——— */
+.rows{margin-top:2.6rem;border-bottom:1px solid var(--rule)}
+.row{align-items:baseline;padding:0.5em 0 0.42em;border-top:1px solid var(--rule)}
+.row > span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .t{grid-column:1 / span 5}
+.row .p{grid-column:6 / span 3}
+.row .c{grid-column:9 / span 2}
+.row .h{grid-column:11 / span 2;justify-self:end;max-width:100%}
+.row.labels{color:var(--muted)}
+@media (hover:hover){
+  .rows:hover a.row{color:var(--muted)}
+  .rows a.row:hover{color:var(--ink)}
+}
+a.row:focus-visible{outline-offset:-1px}
+.peek{position:fixed;z-index:9;left:0;top:0;width:min(36rem, 34vw);aspect-ratio:16 / 10;border-radius:1.3rem;overflow:hidden;background:var(--media);pointer-events:none}
+.peek[hidden]{display:none}
+.peek img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+
+.state{grid-column:1 / -1;color:var(--muted);padding:0.86em 0}
+
+/* ——— Dock ——— */
+.dock{
+  position:fixed;z-index:21;
+  left:max(var(--pad), env(safe-area-inset-left));
+  right:max(var(--pad), env(safe-area-inset-right));
+  bottom:max(var(--pad), env(safe-area-inset-bottom));
+  display:flex;gap:max(8px, 0.8rem);align-items:center;pointer-events:none;
+}
+.dock > *{pointer-events:auto}
+.pill.search{flex:0 1 14em;min-width:0;justify-content:flex-start}
+.pill.search:focus-within{flex-basis:24em}
+.pill.search input{width:100%;min-width:0;height:100%;outline:none}
+.pill.search input::placeholder{color:var(--pill-muted);opacity:1}
+.pill.search input::-webkit-search-cancel-button{display:none}
+
+@media (max-width:759px){
+  .top .mark{grid-column:1 / span 3;width:100%;max-width:14vh}  /* a quarter of the column width */
+  .top .tools{grid-column:5 / span 8}
+  .row{row-gap:0.2em;padding:0.62em 0 0.56em}
+  .row .t{grid-column:1 / -1;white-space:normal}
+  .row .p{grid-column:1 / span 7;color:var(--muted)}
+  .row .c{display:none}
+  .row .h{grid-column:8 / span 5;color:var(--muted)}
+  .row.labels{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="top grid12">
+  <svg class="mark" viewBox="0 0 906.49 785.05" fill="currentColor" role="img" aria-label="Global Design Group"><path d="M453.25,0L0,785.05h906.49L453.25,0ZM453.25,735.05c-116.58,0-211.43-94.85-211.43-211.43s94.85-211.43,211.43-211.43,211.43,94.85,211.43,211.43-94.85,211.43-211.43,211.43ZM559.94,284.8c-33.13-14.82-69.31-22.62-106.7-22.62s-73.56,7.8-106.7,22.62l106.7-184.8,106.7,184.8ZM86.6,735.05l106.57-184.59c6.05,59.69,32.21,115.03,75.21,158.02,9.74,9.74,20.12,18.6,31.03,26.57H86.6ZM638.11,708.48c43-43,69.16-98.33,75.21-158.02l106.57,184.59h-212.81c10.91-7.97,21.29-16.83,31.03-26.57Z"/><path d="M462.58,560.57h55.79v1.12c0,6.94-1.49,13.7-4.46,20.27-2.98,6.57-7.13,12.33-12.46,17.29-5.33,4.96-11.9,8.99-19.71,12.09-7.81,3.1-16.55,4.65-26.22,4.65-11.41,0-21.63-2.29-30.68-6.88-9.05-4.59-16.74-10.97-23.06-19.15s-11.22-17.85-14.69-29.01c-3.47-11.16-5.21-23.43-5.21-36.82s1.49-24.98,4.46-36.26c2.98-11.28,7.5-21.01,13.58-29.2,6.08-8.18,13.64-14.63,22.69-19.34s19.77-7.07,32.17-7.07c15.87,0,28.27,3.66,37.19,10.97,8.93,7.31,15.13,16.18,18.6,26.59h63.23c-2.48-13.14-6.88-25.23-13.2-36.26-6.32-11.03-14.57-20.52-24.73-28.45s-22.19-14.13-36.08-18.6c-13.88-4.46-29.51-6.69-46.86-6.69-18.35,0-34.71,2.6-49.1,7.81s-27.15,12.52-38.31,21.94c-15.62,13.14-27.52,29.57-35.71,49.28-8.18,19.71-12.27,41.47-12.27,65.27,0,21.32,3.1,40.85,9.3,58.58,6.2,17.73,15.37,33.16,27.52,46.31,11.41,12.15,24.98,21.63,40.73,28.45s33.54,10.23,53.37,10.23c17.11,0,32.61-3.41,46.49-10.23s24.92-17.92,33.1-33.29h1.12l5.21,37.19h43.89v-148.03h-115.67v47.24Z"/></svg>
+  <div class="meta-row">
+    <p class="stats" id="stats" aria-live="polite"></p>
+    <p class="clock" id="clock" aria-label="Your local time"></p>
+  </div>
+  <div class="tools">
+    <button class="pill" id="theme" type="button">Light</button>
+    <a class="pill apply-link" href="#">Apply</a>
+  </div>
+</header>
+
+<main id="list" class="cards"></main>
+<div class="peek" id="peek" aria-hidden="true" hidden><img alt=""></div>
+
+<section class="info frost" id="info" role="dialog" aria-modal="true" aria-labelledby="info-title" hidden>
+  <div class="copy">
+    <p id="info-title">Global Design Group [GDG].<br>A digital collective of creatives from around the globe.</p>
+    <p>What started as a bunch of friends from the creative industry connecting on Slack has grown into a global community of 200+ leading designers, directors and creatives. Still not taking ourselves too seriously.</p>
+    <p class="meta">Font used: <span class="credit">Areal by Dinamo</span></p>
+  </div>
+  <button class="x" id="info-close" type="button" aria-label="Close"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.4" fill="none"/></svg></button>
+</section>
+
+<nav class="dock" aria-label="Index controls">
+  <button class="pill" id="info-open" type="button" aria-controls="info" aria-expanded="false">Info</button>
+  <button class="pill strong" id="view" type="button">Grid</button>
+  <button class="pill" id="sort" type="button">Latest</button>
+  <label class="pill search"><span class="sr">Search the index</span><input id="q" type="search" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"></label>
+</nav>
+
+<script src="/vendor/gsap/gsap.min.js"></script>
+<script src="/vendor/gsap/ScrollTrigger.min.js"></script>
+<script>
+(() => {
+  // ——— Settings ———
+  const APPLY_EMAIL = ['apply.globaldesigngroup', 'gmail.com'].join('@'); // never shown on the page; split so scrapers miss it
+  const APPLY_SUBJECT = 'Joining Global Design Group';
+  const API = '/api/sites';
+  const REFRESH_MS = 120000;        // the count and list update on their own
+  const AUTOPLAY_MS = 2400;         // touch screens: how long each card image shows
+  const MAX_IMAGES = 6;
+
+  const $ = (s, r = document) => r.querySelector(s);
+  const root = document.documentElement;
+  const list = $('#list');
+  const input = $('#q');
+  const sortBtn = $('#sort');
+  const viewBtn = $('#view');
+  const themeBtn = $('#theme');
+  const statsEl = $('#stats');
+  const peek = $('#peek');
+  const peekImg = peek.querySelector('img');
+
+  // Motion: GSAP when it loaded and the viewer hasn't asked for reduced motion. Otherwise, cuts.
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  const G = window.gsap;
+  const motion = () => !!G && !reduce.matches;
+  if (G && window.ScrollTrigger) G.registerPlugin(window.ScrollTrigger);
+  const EASE = 'power3.out';
+
+  // ——— Apply ———
+  for (const a of document.querySelectorAll('.apply-link')) {
+    a.href = `mailto:${APPLY_EMAIL}?subject=${encodeURIComponent(APPLY_SUBJECT)}`;
+  }
+
+  // Pill labels swap with a short blur.
+  function setLabel(btn, text, aria) {
+    if (aria) btn.setAttribute('aria-label', aria);
+    if (btn.textContent === text) return;
+    btn.textContent = text;
+    if (motion()) G.fromTo(btn, { filter: 'blur(4px)', opacity: 0.4 }, { filter: 'blur(0px)', opacity: 1, duration: 0.35, ease: EASE, clearProps: 'filter,opacity' });
+  }
+
+  // ——— Theme: follows the device until the viewer picks one ———
+  const dark = matchMedia('(prefers-color-scheme: dark)');
+  const currentTheme = () => root.getAttribute('data-theme') || (dark.matches ? 'dark' : 'light');
+  const paintThemeButton = () => {
+    const t = currentTheme();
+    setLabel(themeBtn, t === 'dark' ? 'Dark' : 'Light', t === 'dark' ? 'Dark mode. Switch to light' : 'Light mode. Switch to dark');
+  };
+  themeBtn.addEventListener('click', () => {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('gdg-theme', next); } catch {}
+    paintThemeButton();
+  });
+  dark.addEventListener?.('change', paintThemeButton);
+  paintThemeButton();
+
+  const collator = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
+  const nameKey = (s) => (s.title || s.host).replace(/^(the|a)\s+/i, '');
+
+  // Stored images go through Vercel's image resizer; anything else loads as is.
+  const BLOB = /^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\//;
+  const sized = (u, w) => `/_vercel/image?url=${encodeURIComponent(u)}&w=${w}&q=75`;
+  const SIZES = '(min-width:3000px) 25vw, (min-width:1200px) 33vw, (min-width:760px) 50vw, 100vw';
+  function setImage(img, u, sizes = SIZES) {
+    if (BLOB.test(u)) {
+      img.src = sized(u, 960);
+      img.srcset = [640, 960, 1440].map((w) => `${sized(u, w)} ${w}w`).join(', ');
+      img.sizes = sizes;
+    } else {
+      img.removeAttribute('srcset');
+      img.src = u;
+    }
+  }
+
+  // ——— State (mirrored in the URL so a view can be shared) ———
+  const params = new URLSearchParams(location.search);
+  let view = params.get('view') === 'index' ? 'index' : 'grid';
+  let sort = params.get('sort') === 'name' ? 'name' : 'latest';
+  let query = params.get('q') || '';
+  let sites = null;
+  let countries = 0;
+  input.value = query;
+
+  function syncUrl() {
+    const p = new URLSearchParams(location.search);
+    view === 'index' ? p.set('view', 'index') : p.delete('view');
+    sort === 'name' ? p.set('sort', 'name') : p.delete('sort');
+    query ? p.set('q', query) : p.delete('q');
+    const s = p.toString();
+    try { history.replaceState(history.state, '', (s ? `?${s}` : location.pathname) + location.hash); } catch {}
+  }
+
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const svg = (d) => {
+    const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', '0 0 10 10'); s.setAttribute('aria-hidden', 'true');
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', d); p.setAttribute('stroke', 'currentColor'); p.setAttribute('stroke-width', '1.4'); p.setAttribute('fill', 'none');
+    s.append(p);
+    return s;
+  };
+  const PLUS = 'M5 0.5v9M0.5 5h9';
+  const CROSS = 'M1 1l8 8M9 1l-8 8';
+
+  // ——— Live count: "212 sites from 34 countries", ticking to the new number ———
+  const shown = { sites: 0, countries: 0 };
+  function paintStats() {
+    statsEl.replaceChildren();
+    if (!sites || !sites.length) return;
+    statsEl.append(el('span', 'n', String(Math.round(shown.sites))), ` ${sites.length === 1 ? 'site' : 'sites'}`);
+    if (countries) {
+      statsEl.append(el('span', 'of', ' from '), el('span', 'n', String(Math.round(shown.countries))), ` ${countries === 1 ? 'country' : 'countries'}`);
+    }
+  }
+  function tickStats() {
+    const target = { sites: sites ? sites.length : 0, countries };
+    if (!motion()) { Object.assign(shown, target); paintStats(); return; }
+    G.to(shown, { ...target, duration: 1.4, ease: 'power2.out', snap: { sites: 1, countries: 1 }, onUpdate: paintStats, overwrite: true });
+  }
+
+  // ——— Clock: the viewer's own time with its UTC offset, e.g. "UTC−4 10:17 PM". Read from the device, no prompt. ———
+  const clockEl = $('#clock');
+  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+  const utcLabel = (d) => {
+    const off = -d.getTimezoneOffset(); // minutes ahead of UTC; follows daylight saving
+    if (!off) return 'UTC';
+    const a = Math.abs(off), h = Math.floor(a / 60), m = a % 60;
+    return `UTC${off < 0 ? '−' : '+'}${h}${m ? ':' + String(m).padStart(2, '0') : ''}`;
+  };
+  function paintClock() {
+    const now = new Date();
+    const t = timeFmt.format(now), zone = utcLabel(now);
+    if (clockEl.dataset.t === zone + t) return;
+    const first = !clockEl.dataset.t;
+    clockEl.dataset.t = zone + t;
+    clockEl.replaceChildren(el('span', 'zone', `${zone} `), el('span', 'time', t));
+    if (!first && motion()) G.fromTo(clockEl.querySelector('.time'), { filter: 'blur(4px)', opacity: 0.4 }, { filter: 'blur(0px)', opacity: 1, duration: 0.35, ease: EASE, clearProps: 'filter,opacity' });
+  }
+  paintClock();
+  setTimeout(() => { paintClock(); setInterval(paintClock, 60000); }, 60000 - (Date.now() % 60000) + 50);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) paintClock(); });
+
+  // ——— Card ———
+  const cardState = new WeakMap(); // card -> { site, slides, index, timer, loading }
+  const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
+
+  function card(s, i) {
+    const art = el('article', 'card');
+    const title = s.title || s.host;
+    const a = el('a', 'hit');
+    a.href = s.url; a.target = '_blank'; a.rel = 'noopener';
+    a.setAttribute('aria-label', [title, s.practice, s.location].filter(Boolean).join(', '));
+
+    const media = el('div', 'media');
+    const fb = el('div', 'fb');
+    fb.setAttribute('aria-hidden', 'true');
+    fb.append(el('span', 't', title), el('span', 'p', s.practice || s.host));
+    media.append(fb);
+    if (s.image) {
+      const img = el('img', 'slide on');
+      img.alt = ''; img.decoding = 'async'; img.loading = i < 3 ? 'eager' : 'lazy';
+      img.width = 1440; img.height = 900;
+      setImage(img, s.image);
+      img.onerror = () => img.remove(); // keep the text card
+      media.append(img);
+    }
+    const cap = el('div', 'cap');
+    cap.append(el('span', 't', title), el('span', 'p', s.practice || s.host));
+    a.append(media, cap);
+
+    const more = el('button', 'more');
+    more.type = 'button';
+    more.setAttribute('aria-label', `Details: ${title}`);
+    more.setAttribute('aria-expanded', 'false');
+    more.append(svg(PLUS));
+
+    // Details panel
+    const panel = el('div', 'panel frost');
+    panel.hidden = true;
+    panel.setAttribute('role', 'group');
+    panel.setAttribute('aria-label', `${title} details`);
+    const head = el('div', 'head');
+    head.append(el('p', 't', title));
+    const meta = el('div', 'meta');
+    if (s.practice) meta.append(el('p', '', s.practice));
+    if (s.location) meta.append(el('p', '', s.location));
+    head.append(meta);
+    const foot = el('div', 'foot');
+    const visit = el('a', 'pill strong', 'Visit site');
+    visit.href = s.url; visit.target = '_blank'; visit.rel = 'noopener';
+    foot.append(el('span', 'host', s.host), visit);
+    const x = el('button', 'x');
+    x.type = 'button';
+    x.setAttribute('aria-label', 'Close details');
+    x.append(svg(CROSS));
+    panel.append(head, foot, x);
+
+    art.append(a, more, panel);
+    more.addEventListener('click', () => openPanel(art));
+    x.addEventListener('click', () => closePanel(art));
+
+    cardState.set(art, { site: s, slides: null, index: 0, timer: null, loading: false });
+    // Desktop: move across the image to flip through it. Leave to return to the cover.
+    media.addEventListener('pointermove', (e) => {
+      if (!finePointer.matches) return;
+      const st = cardState.get(art);
+      if (!st.slides || st.slides.length < 2) return;
+      const r = media.getBoundingClientRect();
+      const idx = Math.min(st.slides.length - 1, Math.floor(((e.clientX - r.left) / r.width) * st.slides.length));
+      show(art, idx);
+    });
+    media.addEventListener('pointerleave', () => { if (finePointer.matches) show(art, 0); });
+    return art;
+  }
+
+  // Load the extra images for a card (once), then build its slides.
+  async function loadGallery(art) {
+    const st = cardState.get(art);
+    if (!st || st.slides || st.loading) return;
+    st.loading = true;
+    let gallery = st.site.gallery;
+    if (!gallery && st.site.galleryUrl) {
+      try { gallery = (await (await fetch(st.site.galleryUrl)).json()).images || []; } catch { gallery = []; }
+      st.site.gallery = gallery;
+    }
+    const media = $('.media', art);
+    const cover = $('img.slide', media);
+    const slides = cover ? [cover] : [];
+    for (const u of (gallery || []).slice(0, MAX_IMAGES - slides.length)) {
+      const img = el('img', 'slide');
+      img.alt = ''; img.decoding = 'async'; img.width = 1440; img.height = 900;
+      setImage(img, u);
+      img.onerror = () => { const k = st.slides.indexOf(img); if (k > 0) { st.slides.splice(k, 1); img.remove(); if (st.index >= st.slides.length) st.index = 0; } };
+      media.append(img);
+      slides.push(img);
+    }
+    st.slides = slides;
+    st.loading = false;
+  }
+  function show(art, idx) {
+    const st = cardState.get(art);
+    if (!st.slides || idx === st.index || !st.slides[idx]) return;
+    const prev = st.slides[st.index], next = st.slides[idx];
+    st.index = idx;
+    if (motion()) {
+      // Quick swap: the new image fades in over a slight, eased zoom.
+      G.killTweensOf([prev, next]);
+      next.classList.add('on');
+      G.fromTo(next, { opacity: 0, filter: 'blur(3px)' }, { opacity: 1, filter: 'blur(0px)', duration: 0.26, ease: 'power2.out', clearProps: 'filter' });
+      G.fromTo(next, { scale: 1.04 }, { scale: 1, duration: 0.7, ease: 'power3.out', clearProps: 'transform' });
+      if (prev) G.to(prev, { opacity: 0, duration: 0.22, ease: 'power1.out', onComplete: () => { prev.classList.remove('on'); G.set(prev, { clearProps: 'opacity' }); } });
+    } else {
+      prev?.classList.remove('on');
+      next.classList.add('on');
+    }
+  }
+
+  // Cards near the screen fetch their images; on touch screens, cards mostly on screen cycle on their own.
+  const nearObs = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) { loadGallery(e.target); nearObs.unobserve(e.target); }
+  }, { rootMargin: '300px 0px' }) : null;
+  const playObs = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const st = cardState.get(e.target);
+      if (!st) continue;
+      clearInterval(st.timer); st.timer = null;
+      if (e.isIntersecting && !finePointer.matches) {
+        st.timer = setInterval(() => {
+          if (!st.slides || st.slides.length < 2 || !$('.panel', e.target).hidden || document.hidden) return;
+          show(e.target, (st.index + 1) % st.slides.length);
+        }, AUTOPLAY_MS + Math.random() * 600);
+      }
+    }
+  }, { threshold: 0.6 }) : null;
+
+  // ——— Frosted panels grow out of the button that opens them ———
+  const insetFrom = (box, r, radius) =>
+    `inset(${r.top - box.top}px ${box.right - r.right}px ${box.bottom - r.bottom}px ${r.left - box.left}px round ${radius}px)`;
+  const radiusOf = (panel) => parseFloat(getComputedStyle(panel).borderTopLeftRadius) || 24;
+
+  function grow(panel, fromEl, contentSel, done) {
+    if (!motion()) { done?.(); return; }
+    const box = panel.getBoundingClientRect();
+    const r = fromEl.getBoundingClientRect();
+    G.killTweensOf(panel);
+    G.fromTo(panel, { clipPath: insetFrom(box, r, r.height / 2) },
+      { clipPath: `inset(0px 0px 0px 0px round ${radiusOf(panel)}px)`, duration: 0.6, ease: 'expo.out', clearProps: 'clipPath', onComplete: done });
+    G.fromTo(panel.querySelectorAll(contentSel), { opacity: 0, filter: 'blur(10px)', y: 8 },
+      { opacity: 1, filter: 'blur(0px)', y: 0, duration: 0.55, ease: EASE, stagger: 0.05, delay: 0.12, clearProps: 'filter,transform,opacity' });
+  }
+  function shrink(panel, toEl, contentSel, done) {
+    if (!motion()) { done(); return; }
+    const box = panel.getBoundingClientRect();
+    const r = toEl.getBoundingClientRect();
+    const parts = panel.querySelectorAll(contentSel);
+    G.killTweensOf([panel, ...parts]);
+    G.to(parts, { opacity: 0, filter: 'blur(8px)', duration: 0.2, ease: 'power2.in' });
+    G.fromTo(panel, { clipPath: `inset(0px 0px 0px 0px round ${radiusOf(panel)}px)` },
+      { clipPath: insetFrom(box, r, r.height / 2), duration: 0.45, ease: 'expo.inOut',
+        onComplete: () => { G.set(parts, { clearProps: 'all' }); G.set(panel, { clearProps: 'clipPath' }); done(); } });
+  }
+
+  let openCard = null;
+  const PANEL_PARTS = '.head > *, .foot > *, .x';
+  function openPanel(art) {
+    if (openCard && openCard !== art) closePanel(openCard, true);
+    const panel = $('.panel', art), more = $('.more', art);
+    if (!panel.hidden) return;
+    panel.hidden = false;
+    art.classList.add('open');
+    more.setAttribute('aria-expanded', 'true');
+    openCard = art;
+    grow(panel, more, PANEL_PARTS);
+    $('.x', panel).focus({ preventScroll: true });
+  }
+  function closePanel(art, instant) {
+    const panel = $('.panel', art), more = $('.more', art);
+    if (panel.hidden) return;
+    const done = () => { panel.hidden = true; art.classList.remove('open'); more.setAttribute('aria-expanded', 'false'); };
+    if (openCard === art) openCard = null;
+    instant ? done() : shrink(panel, more, PANEL_PARTS, () => { done(); more.focus({ preventScroll: true }); });
+  }
+
+  // ——— Index row ———
+  function row(s) {
+    const a = el('a', 'row grid12');
+    a.href = s.url; a.target = '_blank'; a.rel = 'noopener';
+    a.append(el('span', 't', s.title || s.host), el('span', 'p', s.practice || ''), el('span', 'c', s.location || ''), el('span', 'h', s.host));
+    if (s.image) a.dataset.image = s.image;
+    return a;
+  }
+
+  // ——— Render ———
+  function visibleSites() {
+    const q = query.trim().toLowerCase();
+    const rows = q ? sites.filter((s) => `${s.title} ${s.practice || ''} ${s.location || ''} ${s.country || ''} ${s.host}`.toLowerCase().includes(q)) : sites.slice();
+    rows.sort(sort === 'name'
+      ? (a, b) => collator.compare(nameKey(a), nameKey(b))
+      : (a, b) => (a.added < b.added ? 1 : a.added > b.added ? -1 : 0)); // the date is never shown; it only orders Latest
+    return rows;
+  }
+
+  function render() {
+    setLabel(viewBtn, view === 'index' ? 'Index' : 'Grid', view === 'index' ? 'Index view. Switch to grid' : 'Grid view. Switch to index');
+    setLabel(sortBtn, sort === 'name' ? 'A–Z' : 'Latest', sort === 'name' ? 'Sorted A to Z. Sort by latest' : 'Sorted by latest. Sort A to Z');
+    list.className = view === 'index' ? 'rows' : 'cards';
+    peek.hidden = true;
+    openCard = null;
+    if (!sites) return;
+
+    // Stop the old cards' timers and scroll animations.
+    for (const c of list.querySelectorAll('.card')) clearInterval(cardState.get(c)?.timer);
+    nearObs?.disconnect(); playObs?.disconnect();
+    if (window.ScrollTrigger) window.ScrollTrigger.getAll().forEach((t) => t.kill());
+
+    const rows = visibleSites();
+    const frag = document.createDocumentFragment();
+    if (view === 'index' && rows.length) {
+      const labels = el('div', 'row grid12 labels');
+      labels.setAttribute('aria-hidden', 'true');
+      labels.append(el('span', 't', 'Site'), el('span', 'p', 'Practice'), el('span', 'c', 'Location'), el('span', 'h', 'Address'));
+      frag.append(labels);
+    }
+    if (!sites.length) frag.append(el('p', 'state', 'Nothing here yet.'));
+    else if (!rows.length) frag.append(el('p', 'state', `No sites match “${query.trim()}”.`));
+    rows.forEach((s, i) => frag.append(view === 'index' ? row(s) : card(s, i)));
+    list.replaceChildren(frag);
+
+    const items = [...list.querySelectorAll(view === 'index' ? 'a.row' : '.card')];
+    if (view === 'grid') items.forEach((c) => { nearObs?.observe(c); playObs?.observe(c); });
+    reveal(items);
+  }
+
+  // Items blur in as they scroll into view.
+  function reveal(items) {
+    if (!motion() || !window.ScrollTrigger || !items.length) return;
+    const grid = view === 'grid';
+    G.set(items, { opacity: 0 });
+    window.ScrollTrigger.batch(items, {
+      start: 'top 94%',
+      once: true,
+      onEnter: (batch) => G.fromTo(batch,
+        { opacity: 0, y: grid ? 28 : 10, filter: `blur(${grid ? 10 : 5}px)` },
+        { opacity: 1, y: 0, filter: 'blur(0px)', duration: grid ? 0.8 : 0.5, ease: EASE, stagger: grid ? 0.08 : 0.03, clearProps: 'filter,transform' }),
+    });
+    window.ScrollTrigger.refresh();
+  }
+
+  // Switching Grid / Index (or sort) cross-blurs the list.
+  function rerender() {
+    if (!motion() || !sites) { render(); return; }
+    G.to(list, { opacity: 0, filter: 'blur(6px)', duration: 0.18, ease: 'power2.in', onComplete: () => { render(); G.set(list, { clearProps: 'opacity,filter' }); } });
+  }
+
+  // ——— Index hover preview ———
+  let peekFor = null;
+  list.addEventListener('pointermove', (e) => {
+    if (view !== 'index' || !finePointer.matches) return;
+    const r = e.target.closest('a.row');
+    if (!r || !r.dataset.image) { peek.hidden = true; peekFor = null; return; }
+    if (peekFor !== r) {
+      peekFor = r;
+      setImage(peekImg, r.dataset.image, '34vw');
+      if (peek.hidden && motion()) G.fromTo(peek, { opacity: 0, filter: 'blur(8px)' }, { opacity: 1, filter: 'blur(0px)', duration: 0.3, ease: EASE, clearProps: 'filter,opacity' });
+    }
+    const w = peek.offsetWidth || innerWidth * 0.34, h = peek.offsetHeight || w * 0.625;
+    let x = e.clientX + 24, y = e.clientY + 24;
+    if (x + w > innerWidth - 16) x = e.clientX - w - 24;
+    if (y + h > innerHeight - 16) y = innerHeight - h - 16;
+    peek.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    peek.hidden = false;
+  });
+  list.addEventListener('pointerleave', () => { peek.hidden = true; peekFor = null; });
+  peekImg.onerror = () => { peek.hidden = true; };
+  addEventListener('scroll', () => { peek.hidden = true; peekFor = null; }, { passive: true });
+
+  // ——— Info panel (from the Info pill; #info, so the back button closes it) ———
+  const info = $('#info');
+  const infoOpen = $('#info-open');
+  const infoClose = $('#info-close');
+  const INFO_PARTS = '.copy > *, .x';
+  let pushed = false;
+  function showInfo(on, animate = true) {
+    if (on === !info.hidden) return;
+    infoOpen.classList.toggle('on', on);
+    infoOpen.setAttribute('aria-expanded', String(on));
+    root.style.overflow = on ? 'hidden' : '';
+    peek.hidden = true;
+    if (on) {
+      info.hidden = false;
+      info.scrollTop = 0;
+      if (animate) grow(info, infoOpen, INFO_PARTS);
+      infoClose.focus({ preventScroll: true });
+    } else {
+      const done = () => { info.hidden = true; infoOpen.focus({ preventScroll: true }); };
+      animate ? shrink(info, infoOpen, INFO_PARTS, done) : done();
+    }
+  }
+  function openInfo() {
+    if (!info.hidden) return closeInfo();
+    try { history.pushState({ info: true }, '', '#info'); pushed = true; } catch {}
+    showInfo(true);
+  }
+  function closeInfo() {
+    if (info.hidden) return;
+    if (pushed) { pushed = false; history.back(); return; } // popstate closes it
+    try { history.replaceState(null, '', location.pathname + location.search); } catch {}
+    showInfo(false);
+  }
+  infoOpen.addEventListener('click', openInfo);
+  infoClose.addEventListener('click', closeInfo);
+  addEventListener('popstate', () => { const on = location.hash === '#info'; if (!on) pushed = false; showInfo(on); });
+  if (location.hash === '#info') showInfo(true, false);
+
+  // ——— Controls ———
+  const closeInfoFirst = () => { if (!info.hidden) closeInfo(); };
+  viewBtn.addEventListener('click', () => { closeInfoFirst(); view = view === 'index' ? 'grid' : 'index'; syncUrl(); rerender(); });
+  sortBtn.addEventListener('click', () => { closeInfoFirst(); sort = sort === 'name' ? 'latest' : 'name'; syncUrl(); rerender(); });
+  input.addEventListener('focus', closeInfoFirst);
+  input.addEventListener('input', () => { query = input.value; syncUrl(); render(); });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (!info.hidden) return closeInfo();
+      if (openCard) return closePanel(openCard);
+      if (document.activeElement === input) { input.value = ''; query = ''; syncUrl(); render(); input.blur(); }
+    } else if (e.key === '/' && document.activeElement !== input) { e.preventDefault(); input.focus(); }
+  });
+
+  // ——— Data ———
+  const clean = (arr) => arr.filter((s) => s && /^https?:\/\//i.test(s.url));
+  const signature = (arr) => arr.map((s) => `${s.url}|${s.title}|${s.practice}|${s.location}|${s.country}|${s.image}`).join('\n');
+  // Country can hold several ("Canada, Denmark"); each counts once. Matches lib/countries.js.
+  const countryList = (v) => String(v || '').split(/\s*(?:,|;|\/|&|\band\b|\+)\s*/i).map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const countCountries = (arr) => new Set(arr.flatMap((s) => countryList(s.country))).size;
+
+  async function fetchSites() {
+    const res = await fetch(API, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    const next = clean(data.sites || []);
+    return { next, countries: typeof data.countries === 'number' ? data.countries : countCountries(next) };
+  }
+
+  async function load() {
+    try {
+      const r = await fetchSites();
+      sites = r.next; countries = r.countries;
+    } catch {
+      list.replaceChildren(el('p', 'state', 'The index is unavailable right now. Try again in a minute.'));
+      return;
+    }
+    render();
+    tickStats();
+    setInterval(refresh, REFRESH_MS);
+  }
+
+  // New sites show up without a reload; the count ticks to the new number.
+  async function refresh() {
+    if (document.hidden) return;
+    try {
+      const r = await fetchSites();
+      if (signature(r.next) === signature(sites) && r.countries === countries) return;
+      sites = r.next; countries = r.countries;
+      if (!openCard && info.hidden) render();
+      tickStats();
+    } catch {}
+  }
+
+
+  render();
+  load();
+})();
+</script>
+</body>
+</html>

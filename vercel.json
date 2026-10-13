@@ -1,0 +1,24 @@
+{
+  "cleanUrls": true,
+  "crons": [
+    { "path": "/api/check", "schedule": "0 14 1 * *" },
+    { "path": "/api/check?mode=sync", "schedule": "0 13 * * *" }
+  ],
+  "functions": {
+    "api/check.js": { "maxDuration": 60 },
+    "api/cover.js": { "maxDuration": 60 },
+    "api/gallery.js": { "maxDuration": 60 }
+  },
+  "images": {
+    "sizes": [640, 960, 1440],
+    "formats": ["image/avif", "image/webp"],
+    "minimumCacheTTL": 2678400,
+    "remotePatterns": [{ "protocol": "https", "hostname": "*.public.blob.vercel-storage.com" }]
+  },
+  "headers": [
+    {
+      "source": "/fonts/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    }
+  ]
+}

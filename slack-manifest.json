@@ -1,0 +1,27 @@
+{
+  "display_information": {
+    "name": "GDG Library",
+    "description": "Publishes ✅-approved links from the channel to globaldesign.group",
+    "background_color": "#111111"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "GDG Library",
+      "always_online": false
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": ["channels:history", "reactions:read"]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "https://globaldesign.group/api/slack",
+      "bot_events": ["reaction_added", "reaction_removed"]
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
