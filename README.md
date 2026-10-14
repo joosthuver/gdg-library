@@ -347,7 +347,7 @@ curl -X POST "<your Vercel address>/api/import" \
 
 Tests need Node 20 or newer; run `npm install` first.
 
-- `npm test`: 83 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
+- `npm test`: 84 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
   images and the preload, with all outside services mocked.
 - `npm run test:browser`: 401 checks in Chromium across phones, tablet and desktop up to 2560,
   light and dark, reduced motion, GSAP missing, an empty index and the API being down.

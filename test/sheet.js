@@ -162,6 +162,22 @@ await t('monthly check: if Google refuses the new rows, nothing is marked as in 
   assert.equal(rows().filter((r) => r[C.url].includes('ondine')).length, 1, 'row added once Google allows it');
 });
 
+await t('new rows go in from column A, under the last filled row, without Google’s append (which can shift a row sideways)', async () => {
+  await unapprove('100.4');
+  // The last row has only its Gallery cell filled, like a long Gallery spilling over.
+  sheets.Sites.rows.push(row({ gallery: 'https://cdn.example/x.jpg' }));
+  const lastFilled = sheets.Sites.rows.length;
+  const sent = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = (u, o) => { sent.push(String(u)); return real(u, o); };
+  try { await approve('100.4'); } finally { globalThis.fetch = real; }
+  assert.ok(!sent.some((u) => /Sites[^?]*:append/.test(decodeURIComponent(u))), 'no append on the Sites tab');
+  const r = sheets.Sites.rows[lastFilled];
+  assert.match(r[C.url], /ondine\.example/, 'URL in the URL column');
+  assert.equal(r[C.gallery] || '', '', 'nothing pushed into Gallery');
+  sheets.Sites.rows.splice(lastFilled - 1, 1); // tidy up the stray row
+});
+
 await t('sheet outage during un-approval: check deletes the leftover row, Slack wins', async () => {
   await approve('200.9');
   sheetsDown(true);

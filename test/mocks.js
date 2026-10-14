@@ -109,10 +109,10 @@ async function sheetsApi(url, opts) {
         s.rows.splice(q.deleteDimension.range.startIndex, 1);
       }
       if (q.insertDimension) {
-        const { sheetId, dimension, startIndex } = q.insertDimension.range;
-        assert.equal(dimension, 'COLUMNS');
+        const { sheetId, dimension, startIndex, endIndex } = q.insertDimension.range;
         const s = Object.values(sheets).find((x) => x.id === sheetId);
-        for (const r of s.rows) if (r && r.length > startIndex) r.splice(startIndex, 0, '');
+        if (dimension === 'ROWS') { if (startIndex < s.rows.length) s.rows.splice(startIndex, 0, ...Array.from({ length: endIndex - startIndex }, () => [])); }
+        else for (const r of s.rows) if (r && r.length > startIndex) r.splice(startIndex, 0, '');
       }
       if (q.setDataValidation) validations.push(q.setDataValidation);
     }
