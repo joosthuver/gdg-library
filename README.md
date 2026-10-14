@@ -26,7 +26,7 @@ Once a month the site is checked against the sheet. The sheet wins.
   lets them update their own listing, e.g. their availability, without needing approval.
 - **Or approve a link:** an approver reacts ✅ to any message with a link. Every link in it goes live within 30 seconds.
 - **Un-approve:** remove the ✅. Those links come off the site and out of the sheet.
-- **Cards show work, never a screenshot of the site.** Each card holds up to 6 images. The first
+- **Cards show work, never a screenshot of the site** (nor the site's share image, which often is one). Each card holds up to 6 images. The first
   is the cover, and the rest play as a slideshow. They're found on the member's homepage
   automatically, or chosen in the form or the sheet's Gallery column. Each card shows the name and
   title, plus an "Available for work" pill when they are. The + panel adds company and location.
@@ -290,8 +290,8 @@ For anything it doesn't explain, Vercel → project → **Logs** has the full er
 |---|---|
 | ✅ does nothing | The reactor's ID is in `APPROVERS`; the bot is in the channel (`/invite @GDG Library`); `SLACK_CHANNEL_ID` is that channel; the message is under 90 days old; the Request URL shows Verified |
 | Slack says `/directory` "is not a valid command", or "dispatch_failed" | The Slack app needs the updated manifest (see "Updating the Slack app" below); the status page shows this as ✗ /directory form |
-| A card appears but the sheet doesn't update | The sheet is shared with the service account as **Editor**; `GOOGLE_PRIVATE_KEY` was pasted whole; the Sheets API is enabled |
-| A card shows just the name | No usable images were found on the site (it's looked at again after a week), or the 50-a-day limit for sites built in JavaScript was reached (it fills in on a later visit). Paste image addresses in the Gallery column to fix it for good |
+| A card appears but the sheet doesn't update | The status page says why, in Google's words, under Google Sheet and Latest from Slack. If the sheet can't be edited, share it with the service account as **Editor**. The site stays live either way; the missing row is added on the next monthly check, or run `/api/check` by hand |
+| A card shows just the name | No images of work were found on the site (it's looked at again after a week; share images are never used, since they're often a picture of the page), or the 50-a-day limit for sites built in JavaScript was reached (it fills in on a later visit). Paste image addresses in the Gallery column to fix it for good |
 | A card shows the wrong images | Paste the right ones in the Gallery column |
 | The page says "unavailable" | Redis is connected to the project (step 3) and the project was redeployed afterwards |
 | A new site takes a while to appear | The list is cached for 30 seconds |
@@ -347,7 +347,7 @@ curl -X POST "<your Vercel address>/api/import" \
 
 Tests need Node 20 or newer; run `npm install` first.
 
-- `npm test`: 77 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
+- `npm test`: 80 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
   images and the preload, with all outside services mocked.
 - `npm run test:browser`: 401 checks in Chromium across phones, tablet and desktop up to 2560,
   light and dark, reduced motion, GSAP missing, an empty index and the API being down.

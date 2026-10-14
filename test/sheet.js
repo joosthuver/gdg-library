@@ -1,7 +1,7 @@
 // Google Sheet sync + monthly check, end to end with everything mocked.
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { sheets, reactions, validations, resetClaims, hash, PRIVATE_PEM } from './mocks.js';
+import { sheets, reactions, validations, resetClaims, hash, sheetAccess, PRIVATE_PEM } from './mocks.js';
 
 Object.assign(process.env, {
   SLACK_SIGNING_SECRET: 'test-secret', SLACK_BOT_TOKEN: 'xoxb-test', APPROVERS: 'UADMIN', SLACK_CHANNEL_ID: 'CSITES',
@@ -13,6 +13,7 @@ Object.assign(process.env, {
 const { POST } = await import('../api/slack.js');
 const { GET: SITES } = await import('../api/sites.js');
 const { GET: CHECK } = await import('../api/check.js');
+const { GET: STATUS } = await import('../api/status.js');
 
 const signed = (body) => {
   const raw = JSON.stringify(body), ts = Math.floor(Date.now() / 1000);
@@ -109,6 +110,23 @@ await t('sheet outage during approval: site still updates, check appends the mis
   assert.equal(r.addedToSheet, 1);
   assert.equal(rows().find((x) => x[1].includes('ondine'))[C.status], 'Added to sheet');
   assert.ok((await hosts()).includes('ondine.example'), 'not removed');
+});
+
+await t('sheet shared as Viewer: the site still updates, and the status page says why the row is missing and what to do', async () => {
+  await unapprove('100.4');
+  sheetAccess.readOnly = true;
+  try {
+    assert.equal((await approve('100.4')).status, 200);
+    assert.ok((await hosts()).includes('ondine.example'));
+    assert.ok(!urls().some((u) => u.includes('ondine')));
+    const html = await (await STATUS()).text();
+    assert.match(html, /can’t edit the sheet/);
+    assert.match(html, /Couldn’t add ondine\.example to the sheet/);
+    assert.match(html, /gdg@test\.iam\.gserviceaccount\.com as Editor/);
+  } finally { sheetAccess.readOnly = false; }
+  assert.match(await (await STATUS()).text(), /Connected and can edit/);
+  await check();
+  assert.ok(urls().some((u) => u.includes('ondine')), 'the check adds the row once editing works');
 });
 
 await t('sheet outage during un-approval: check deletes the leftover row, Slack wins', async () => {

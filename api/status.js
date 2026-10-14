@@ -40,7 +40,10 @@ async function googleSheet() {
   if (m) return m;
   try {
     const rows = (await withTimeout(sheet.readRows(), 12000)).filter((r) => r.url).length;
-    return { ok: true, text: `Connected. ${rows} row${rows === 1 ? '' : 's'} in the Sites tab.` };
+    try { await withTimeout(sheet.canWrite()); } catch (err) {
+      return { ok: false, text: `Can read ${rows} row${rows === 1 ? '' : 's'} but can’t edit the sheet, so new sites and /directory updates don’t reach it.`, fix: sheet.explainSheetError(err) };
+    }
+    return { ok: true, text: `Connected and can edit. ${rows} row${rows === 1 ? '' : 's'} in the Sites tab.` };
   } catch (err) {
     const msg = err.message || '';
     if (/invalid_grant|private key|PEM|DECODER|asn1/i.test(msg)) return { ok: false, text: 'Google won’t accept the key.', fix: 'Paste GOOGLE_PRIVATE_KEY again: everything between the quotes after "private_key", from -----BEGIN to END PRIVATE KEY-----\\n. Then redeploy.' };

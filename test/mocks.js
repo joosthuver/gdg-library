@@ -23,6 +23,7 @@ export const calls = [];
 export const slack = { posts: [], views: [], scopes: 'channels:history,reactions:read,chat:write,commands', nextTs: 300 }; // what the app sent to Slack
 export const sheets = {}; // title -> { id, rows: [[...]] }  (row 0 = header)
 export const validations = []; // dropdowns set on the sheet
+export const sheetAccess = { readOnly: false }; // true: shared as Viewer, so every write is refused
 let nextSheetId = 100;
 
 globalThis.fetch = async (url, opts = {}) => {
@@ -97,6 +98,7 @@ async function sheetsApi(url, opts) {
   const path = u.pathname.replace('/v4/spreadsheets/SHEET1', '');
   const body = opts.body ? JSON.parse(opts.body) : null;
   const method = opts.method || 'GET';
+  if (sheetAccess.readOnly && method !== 'GET') return Response.json({ error: { message: 'The caller does not have permission' } }, { status: 403 });
   if (path === '' && method === 'GET') return Response.json({ sheets: Object.entries(sheets).map(([title, s]) => ({ properties: { title, sheetId: s.id } })) });
   if (path === ':batchUpdate') {
     for (const q of body.requests) {

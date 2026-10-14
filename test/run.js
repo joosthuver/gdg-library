@@ -66,7 +66,7 @@ await t('approver ✅ publishes every link in the message, with titles', async (
   const s = await sites();
   assert.equal(s.length, 2);
   const ond = s.find((x) => x.host === 'ondine.example');
-  assert.equal(ond.title, 'Ondine Studio — Identity & motion');
+  assert.equal(ond.title, 'Ondine Studio', 'the page title trimmed to a name');
   assert.equal(ond.url, 'https://www.ondine.example/', 'tracking params stripped');
   assert.equal(s.find((x) => x.host === 'mara.example').title, 'Mara Lindqvist');
   assert.ok(!('srcs' in ond), 'internal fields not public');
@@ -80,7 +80,7 @@ await t('message with no links is a no-op', async () => {
 await t('unfurl title + image used, no page fetch', async () => {
   const before = calls.filter((c) => c.includes('north.example')).length;
   await POST(react('reaction_added', 'UADMIN', '100.3'));
-  assert.equal((await sites()).find((x) => x.host === 'north.example').title, 'North Works — Studio');
+  assert.equal((await sites()).find((x) => x.host === 'north.example').title, 'North Works');
   assert.equal(calls.filter((c) => c.includes('north.example')).length, before);
 });
 
@@ -89,7 +89,7 @@ await t('same site posted again merges into one entry, keeps title + date', asyn
   await POST(react('reaction_added', 'UADMIN', '100.4'));
   const s = await sites();
   assert.equal(s.filter((x) => x.host === 'ondine.example').length, 1);
-  assert.equal(s.find((x) => x.host === 'ondine.example').title, 'Ondine Studio — Identity & motion');
+  assert.equal(s.find((x) => x.host === 'ondine.example').title, 'Ondine Studio');
 });
 
 await t('slow site falls back to hostname within the time budget', async () => {
@@ -101,7 +101,7 @@ await t('slow site falls back to hostname within the time budget', async () => {
 
 await t('message inside a thread is found', async () => {
   await POST(react('reaction_added', 'UADMIN', '200.9'));
-  assert.equal((await sites()).find((x) => x.host === 'thread.example').title, 'Thread – Work');
+  assert.equal((await sites()).find((x) => x.host === 'thread.example').title, 'Thread');
 });
 
 await t('retry of the same event is idempotent', async () => {
@@ -202,6 +202,13 @@ await t('status page: a fully set-up site says so (Blob connected the new way, w
   for (const k of Object.keys(process.env)) if (!(k in before)) delete process.env[k];
   Object.assign(process.env, before);
   assert.match(html, /Everything is set up\./, html.match(/<li class="no">.*?<\/li>/)?.[0]);
+});
+
+await t('a page title becomes a name: the part before the first separator', async () => {
+  const { nameFromTitle } = await import('../lib/meta.js');
+  assert.equal(nameFromTitle('Pedro Barroso - Designer and Creative Director — Home'), 'Pedro Barroso');
+  assert.equal(nameFromTitle('Studio Ondine | Work'), 'Studio Ondine');
+  assert.equal(nameFromTitle('Anne-Marie Lee'), 'Anne-Marie Lee'); // a hyphen inside a name stays
 });
 
 await t('countries are counted once each, case-insensitively, several per site allowed', async () => {

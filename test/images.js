@@ -111,10 +111,10 @@ await t('reads sizes from JPEG, PNG, WebP and GIF headers', async () => {
   assert.equal(imageSize(Buffer.from('not an image at all, just some text here')), null);
 });
 
-await t('finds images in page order, largest srcset, lazy data-src, backgrounds; share image last; skips svg, data:, logos', async () => {
+await t('finds images in page order, largest srcset, lazy data-src, backgrounds; never the share image; skips svg, data:, logos', async () => {
   const c = candidatesFromHtml(PAGE, 'https://work.example/');
   assert.equal(c[0], 'https://work.example/img/hero.jpg');
-  assert.equal(c.at(-1), 'https://work.example/share.png');
+  assert.ok(!c.includes('https://work.example/share.png'), 'share image never a candidate');
   assert.ok(c.includes('https://work.example/img/project-2400.jpg'));
   assert.ok(!c.includes('https://work.example/img/project-800.jpg'), 'smaller srcset variant dropped');
   assert.ok(c.includes('https://work.example/img/plate.webp'));
@@ -148,11 +148,11 @@ await t('later views reuse what was stored', async () => {
   assert.equal(puts.length, p);
 });
 
-await t('size check drops logos, icons, tiny files and strips; share image only as a last resort', async () => {
+await t('size check drops logos, icons, tiny files and strips; the share image is never used', async () => {
   entry('work.example', 'https://work.example/');
   await cover('work.example');
   const e = stored('work.example');
-  assert.equal(e.gallery.length, 4, 'hero, project-2400, plate, a.jpg — then share.png last');
+  assert.equal(e.gallery.length, 3, 'hero is the cover, then project-2400, plate, a.jpg — no share.png');
   const fromPage = fetched.filter((u) => u.startsWith('https://work.example/img/'));
   assert.ok(!fromPage.includes('https://work.example/img/mark.svg'));
 });
@@ -162,7 +162,7 @@ await t('sites built in JavaScript: images from the rendered page', async () => 
   const r = await cover('js.example');
   assert.equal(r.status, 302);
   const e = stored('js.example');
-  assert.equal(e.gallery.length, 2, 'rendered-1 is the cover, then rendered-2 and the share image');
+  assert.equal(e.gallery.length, 1, 'rendered-1 is the cover, then rendered-2 — not the share image');
 });
 
 await t('Microlink at its daily limit and nothing on the page → nothing stored, tried again later', async () => {
@@ -200,7 +200,7 @@ await t('Image column: that is the cover, then images from the site (not repeate
   await imp([{ url: 'https://work.example/', title: 'Work', image: 'https://cdn.example/a.jpg' }]);
   await cover('work.example');
   const e = stored('work.example');
-  assert.equal(e.gallery.length, 4, 'hero, project-2400, plate, share — a.jpg not repeated');
+  assert.equal(e.gallery.length, 3, 'hero, project-2400, plate — a.jpg not repeated, no share image');
 });
 
 await t('Gallery links with an Image: used as chosen, any size, without looking at the site', async () => {
@@ -238,6 +238,20 @@ await t('import with a new Image recaptures; one that is not an image falls back
   assert.ok(needsCapture(stored('full.example')));
   assert.equal((await cover('full.example')).status, 302);
   assert.equal(stored('full.example').gallery.length, 5, 'six from the page, the bad link skipped');
+});
+
+await t('a card captured under the old rules (share image allowed) is captured again once; chosen Gallery images are left alone', async () => {
+  const now = new Date().toISOString();
+  const old = { url: 'https://work.example/', thumb: 'https://abc.public.blob.vercel-storage.com/sites/x/0.png', gallery: [], galleryAt: now };
+  assert.ok(needsCapture(old), 'found automatically before the rule: look again');
+  assert.ok(!needsCapture({ ...old, rule: 2 }), 'already captured under the current rule');
+  assert.ok(!needsCapture({ ...old, picks: ['https://cdn.example/a.jpg'] }), 'chosen in the Gallery: kept');
+  entry('again.example', 'https://work.example/', { og: 'https://work.example/share.png', ...old });
+  await cover('again.example');
+  const e = stored('again.example');
+  assert.equal(e.rule, 2);
+  assert.notEqual(e.thumb, old.thumb);
+  assert.ok(!needsCapture(e), 'only once');
 });
 
 await t('unknown or removed id → 404', async () => {
