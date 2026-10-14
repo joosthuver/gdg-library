@@ -175,9 +175,7 @@ go away. If anything fails, see Troubleshooting below.
 
 ### Step 8 · Add the launch sites
 
-`preload/` holds the nine launch sites (9 sites from 5 countries): Jonas Emmertsen, Camille Mormal,
-Roy van Dijk, Joost Huver, Doug Alves, Anders Svensson, Mike Sullivan, Jordi van der Oord and
-Jacob Grubbe. Each comes with practice, location, country and a Gallery of images of their work.
+`preload/` holds the nine launch sites (9 sites from 5 countries): xxxxxxx Each comes with practice, location, country and a Gallery of images of their work.
 They're timed one minute apart, so Latest shows them in this order.
 
 1. Vercel → **Settings → Cron Jobs** → **Run** the `/api/check?mode=sync` job. This creates the
