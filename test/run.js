@@ -194,9 +194,10 @@ await t('status page: ✓ / ✗ per piece with what to do, latest Slack activity
   for (const secret of ['xoxb-test', 'test-secret', 'redis-token', 'admin-token']) assert.ok(!html.includes(secret), secret);
 });
 
-await t('status page: a fully set-up site says so', async () => {
+await t('status page: a fully set-up site says so (Blob connected the new way, without a token)', async () => {
   const before = { ...process.env };
-  Object.assign(process.env, { APPROVERS: 'U012AB3CD,U045EF6GH', BLOB_READ_WRITE_TOKEN: 'b', CRON_SECRET: 'c', GOOGLE_SHEET_ID: 'SHEET1', GOOGLE_SERVICE_ACCOUNT_EMAIL: 'gdg@test.iam.gserviceaccount.com', GOOGLE_PRIVATE_KEY: (await import('./mocks.js')).PRIVATE_PEM });
+  delete process.env.BLOB_READ_WRITE_TOKEN;
+  Object.assign(process.env, { APPROVERS: 'U012AB3CD,U045EF6GH', BLOB_STORE_ID: 'store_test', CRON_SECRET: 'c', GOOGLE_SHEET_ID: 'SHEET1', GOOGLE_SERVICE_ACCOUNT_EMAIL: 'gdg@test.iam.gserviceaccount.com', GOOGLE_PRIVATE_KEY: (await import('./mocks.js')).PRIVATE_PEM });
   const html = await (await STATUS()).text();
   for (const k of Object.keys(process.env)) if (!(k in before)) delete process.env[k];
   Object.assign(process.env, before);

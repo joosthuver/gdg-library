@@ -30,8 +30,9 @@ async function database() {
 }
 
 function images() {
-  return need(['BLOB_READ_WRITE_TOKEN'], 'Vercel → Storage → open the Blob store → Projects → make sure this project is connected with Production ticked (or create a Public Blob store and connect it), then redeploy. Images already stored keep showing; new ones can’t be saved until then.')
-    || { ok: true, text: 'Connected.' };
+  // Vercel connects new Blob stores without a token (BLOB_STORE_ID, signed in automatically); older ones use BLOB_READ_WRITE_TOKEN.
+  if (env('BLOB_READ_WRITE_TOKEN') || env('BLOB_STORE_ID')) return { ok: true, text: 'Connected.' };
+  return { ok: false, text: 'No Blob store is connected to this project.', fix: 'Vercel → Storage → open the Blob store → Projects → connect this project with Production ticked, then redeploy. Images already stored keep showing; new ones can’t be saved until then.' };
 }
 
 async function googleSheet() {
