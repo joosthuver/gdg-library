@@ -49,6 +49,7 @@ globalThis.fetch = async (url, opts = {}) => {
       if (cmd === 'LTRIM') { lists[key] = (lists[key] || []).slice(Number(a[0]), Number(a[1]) + 1); return { result: 'OK' }; }
       if (cmd === 'LRANGE') return { result: (lists[key] || []).slice(Number(a[0]), Number(a[1]) + 1) };
       if (cmd === 'SET') { const kv = (other['__kv'] ||= new Map()); if (a.includes('NX') && kv.has(key)) return { result: null }; kv.set(key, a[0]); return { result: 'OK' }; }
+      if (cmd === 'DEL') { const kv = (other['__kv'] ||= new Map()); return { result: kv.delete(key) ? 1 : 0 }; }
       if (cmd === 'HDEL') { let n = 0; for (const f of a) n += h.delete(f) ? 1 : 0; return { result: n }; }
       return { error: 'unknown' };
     });

@@ -129,6 +129,39 @@ await t('sheet shared as Viewer: the site still updates, and the status page say
   assert.ok(urls().some((u) => u.includes('ondine')), 'the check adds the row once editing works');
 });
 
+await t('a row missing from the sheet (while the site thinks it’s there) is put back by the next ✅, once', async () => {
+  const id = 'ondine.example';
+  const ondineRow = () => rows().filter((r) => r[C.url].includes('ondine'));
+  assert.equal(ondineRow().length, 1);
+  assert.equal(JSON.parse(hash.get(id)).inSheet, true);
+  sheets.Sites.rows = sheets.Sites.rows.filter((r) => !String(r?.[C.url] || '').includes('ondine')); // row gone, note still set
+  await approve('100.4');
+  assert.equal(ondineRow().length, 1, 'row back');
+  await approve('100.4');
+  assert.equal(ondineRow().length, 1, 'not twice');
+});
+
+await t('Slack sending the same ✅ several times at once adds one row', async () => {
+  await unapprove('100.4');
+  reactions['100.4'] = [{ name: 'white_check_mark', users: ['UADMIN'] }];
+  await Promise.all([1, 2, 3].map(() => POST(react('reaction_added', '100.4'))));
+  assert.equal(rows().filter((r) => r[C.url].includes('ondine')).length, 1);
+});
+
+await t('monthly check: if Google refuses the new rows, nothing is marked as in the sheet, so the site is never taken off for it', async () => {
+  await unapprove('100.4');
+  sheetAccess.readOnly = true;
+  try {
+    await approve('100.4');
+    const r = await check();
+    assert.notEqual(r.status, 200);
+    assert.ok(!JSON.parse(hash.get('ondine.example')).inSheet);
+  } finally { sheetAccess.readOnly = false; }
+  await check();
+  assert.ok((await hosts()).includes('ondine.example'), 'still live');
+  assert.equal(rows().filter((r) => r[C.url].includes('ondine')).length, 1, 'row added once Google allows it');
+});
+
 await t('sheet outage during un-approval: check deletes the leftover row, Slack wins', async () => {
   await approve('200.9');
   sheetsDown(true);
