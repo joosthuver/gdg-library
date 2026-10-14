@@ -349,3 +349,4 @@ Tests need Node 20 or newer; run `npm install` first.
   Screenshots go to `test/shots/`. It needs Playwright's Chromium (`npx playwright install chromium`)
   or `CHROMIUM_PATH`. Check on a real iPhone in Safari before launch.
 
+ 
