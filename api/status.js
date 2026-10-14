@@ -70,10 +70,10 @@ async function slackForm() {
   if (!env('SLACK_BOT_TOKEN')) return { ok: false, text: 'Waiting for SLACK_BOT_TOKEN.' };
   try {
     const have = await withTimeout(scopes());
-    const lacking = ['chat:write', 'commands'].filter((s) => !have.includes(s));
+    const lacking = ['chat:write', 'commands', 'channels:read'].filter((s) => !have.includes(s));
     return lacking.length
-      ? { ok: false, text: `/directory isn’t set up yet: the Slack app is missing ${lacking.join(' and ')}.`, fix: 'Slack app → App Manifest → paste slack-manifest.json → Save, then Install App → Reinstall. If Slack shows a new Bot token, update SLACK_BOT_TOKEN in Vercel and redeploy.' }
-      : { ok: true, text: '/directory is ready.' };
+      ? { ok: false, text: `/directory and the welcome button aren’t fully set up: the Slack app is missing ${lacking.join(', ')}.`, fix: 'Slack app → App Manifest → paste slack-manifest.json → Save, then Install App → Reinstall. If Slack shows a new Bot token, update SLACK_BOT_TOKEN in Vercel and redeploy.' }
+      : { ok: true, text: '/directory and the welcome button for new members are ready.' };
   } catch (err) {
     return { ok: false, text: explainSlackError(err) };
   }

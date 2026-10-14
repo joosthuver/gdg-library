@@ -20,7 +20,8 @@ The site appears on the homepage as a card   →   and as a row in the Google Sh
 Once a month the site is checked against the sheet. The sheet wins.
 ```
 
-- **Join with a form:** in Slack, a member types `/directory`. A short form asks for their site, name,
+- **Join with a form:** anyone joining the Slack channel gets a message only they can see, with a
+  **Join the directory** button. Tapping it (or typing `/directory` anywhere) opens a short form that asks for their site, name,
   title, company, location, availability and (optionally) images of their work. It's posted in the
   channel, and an approver's ✅ publishes it with everything filled in. Running `/directory` again
   lets them update their own listing, e.g. their availability, without needing approval.
@@ -257,7 +258,13 @@ the header names as they are.
 
 ### /directory
 
-What members see: `/directory` in any Slack channel or DM opens a form only they can see.
+What members see: a form only they can see. It opens three ways:
+
+- **Joining the channel:** the bot sends them a message only they can see, with a **Join the directory**
+  button (or **Update your listing**, if they already own one). Once per person; nobody else sees it.
+- **Typing `/directory`** in any channel or DM.
+- **A button in the channel:** an approver types `/directory post` to post the button for everyone
+  already in the channel. Anyone else typing that just gets their form.
 
 | Who submits | What happens |
 |---|---|
@@ -281,7 +288,7 @@ Any change committed to GitHub redeploys the site within a minute.
 ### Troubleshooting
 
 **Start with the status page:** your site's address followed by `/api/status`, e.g. `gdg-library.vercel.app/api/status`.
-It shows a ✓ or ✗ for each piece (database, image storage, sheet, Slack, approvers, the /directory form, schedule),
+It shows a ✓ or ✗ for each piece (database, image storage, sheet, Slack, approvers, the /directory form and welcome button, schedule),
 says what to do about each ✗, and lists the last few ✅ and forms from Slack and what happened to each. It never
 shows the settings' values.
 For anything it doesn't explain, Vercel → project → **Logs** has the full errors.
@@ -290,6 +297,7 @@ For anything it doesn't explain, Vercel → project → **Logs** has the full er
 |---|---|
 | ✅ does nothing | The reactor's ID is in `APPROVERS`; the bot is in the channel (`/invite @GDG Library`); `SLACK_CHANNEL_ID` is that channel; the message is under 90 days old; the Request URL shows Verified |
 | Slack says `/directory` "is not a valid command", or "dispatch_failed" | The Slack app needs the updated manifest (see "Updating the Slack app" below); the status page shows this as ✗ /directory form |
+| New members don't get the button | The Slack app needs the updated manifest (it adds `channels:read` and the "someone joined" event); the bot is in the channel. Latest from Slack notes each welcome |
 | A card appears but the sheet doesn't update | The status page says why, in Google's words, under Google Sheet and Latest from Slack. If the sheet can't be edited, share it with the service account as **Editor**. The site stays live either way; the missing row is added on the next monthly check, or run `/api/check` by hand |
 | A card shows just the name | No images of work were found on the site (it's looked at again after a week; share images are never used, since they're often a picture of the page), or the 50-a-day limit for sites built in JavaScript was reached (it fills in on a later visit). Paste image addresses in the Gallery column to fix it for good |
 | A card shows the wrong images | Paste the right ones in the Gallery column |
@@ -297,9 +305,9 @@ For anything it doesn't explain, Vercel → project → **Logs** has the full er
 | A new site takes a while to appear | The list is cached for 30 seconds |
 | The wrong font | The `fonts/` folder is missing from the repository |
 
-### Updating the Slack app (once, for /directory)
+### Updating the Slack app
 
-The form needs two more Slack permissions and two settings, all in `slack-manifest.json`. A Slack
+Whenever `slack-manifest.json` changes (it last added the welcome button for new members), a Slack
 admin does this once:
 
 1. Slack's app dashboard → **GDG Library → App Manifest** → switch to JSON, replace everything with
@@ -308,7 +316,8 @@ admin does this once:
 2. **Install App → Reinstall to Workspace → Allow.**
 3. If the **Bot User OAuth Token** shown there changed, paste the new one into `SLACK_BOT_TOKEN` in
    Vercel and redeploy.
-4. Open the status page. **/directory form** should show ✓. Then type `/directory` in Slack.
+4. Open the status page. **/directory form** should show ✓. Then type `/directory` in Slack, or
+   `/directory post` to put the button in the channel for members already there.
 
 ---
 
@@ -328,7 +337,7 @@ api/gallery.js        a card's gallery  } first view and stored in Blob
 api/check.js          monthly check and daily sync (Vercel Cron)
 api/import.js         bulk add / remove (Authorization: Bearer ADMIN_TOKEN)
 api/status.js         the setup check page: each piece ✓ / ✗ and recent Slack activity
-lib/directory.js      the /directory form: open, check, post for ✅ or save the owner's changes
+lib/directory.js      the /directory form and its button: welcome new members, open, check, post for ✅ or save the owner's changes
 lib/                  Slack, Redis, Sheets, card images, page metadata, country count
 preload/              the launch sites, as CSV (for the sheet) and JSON (for /api/import)
 slack-manifest.json   the Slack app definition
@@ -347,7 +356,7 @@ curl -X POST "<your Vercel address>/api/import" \
 
 Tests need Node 20 or newer; run `npm install` first.
 
-- `npm test`: 84 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
+- `npm test`: 90 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
   images and the preload, with all outside services mocked.
 - `npm run test:browser`: 401 checks in Chromium across phones, tablet and desktop up to 2560,
   light and dark, reduced motion, GSAP missing, an empty index and the API being down.

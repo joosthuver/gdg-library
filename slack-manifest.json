@@ -1,7 +1,7 @@
 {
   "display_information": {
     "name": "GDG Library",
-    "description": "Publishes ✅-approved sites from the channel to globaldesign.group. /directory to join or update your listing.",
+    "description": "Publishes ✅-approved sites from the channel to globaldesign.group. New members get a button to join; /directory to join or update a listing.",
     "background_color": "#111111"
   },
   "features": {
@@ -22,6 +22,7 @@
     "scopes": {
       "bot": [
         "channels:history",
+        "channels:read",
         "reactions:read",
         "chat:write",
         "commands"
@@ -32,6 +33,7 @@
     "event_subscriptions": {
       "request_url": "https://globaldesign.group/api/slack",
       "bot_events": [
+        "member_joined_channel",
         "reaction_added",
         "reaction_removed"
       ]

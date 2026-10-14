@@ -134,14 +134,73 @@ await t('a member claims a preloaded listing: their form + ✅ replaces the deta
   assert.equal(sheets.Sites.rows.filter((r) => r[1] === 'https://joost.example/').length, 1, 'one row, updated in place');
 });
 
-await t('status page: /directory is ready when the app has its new permissions, and says how to fix it when not', async () => {
+const joins = (user, channel = 'CSITES') => {
+  const raw = JSON.stringify({ type: 'event_callback', event: { type: 'member_joined_channel', user, channel, event_ts: '1760000000.1' } });
+  return POST(new Request('https://x/api/slack', { method: 'POST', body: raw, headers: sign(raw, 'application/json') }));
+};
+const tap = (user) => formPost({ payload: JSON.stringify({ type: 'block_actions', user: { id: user }, trigger_id: `tap-${user}`, actions: [{ action_id: 'gdg_directory_open', value: 'open' }] }) });
+const buttonOf = (blocks) => JSON.parse(blocks).find((b) => b.type === 'actions')?.elements[0];
+
+await t('someone joining the channel gets a message only they can see, with a Join the directory button', async () => {
+  const n = slack.ephemerals.length;
+  assert.equal((await joins('UNEW')).status, 200);
+  assert.equal(slack.ephemerals.length, n + 1);
+  const e = slack.ephemerals.at(-1);
+  assert.equal(e.user, 'UNEW');
+  assert.equal(e.channel, 'CSITES');
+  assert.equal(buttonOf(e.blocks).text.text, 'Join the directory');
+  assert.equal(buttonOf(e.blocks).action_id, 'gdg_directory_open');
+});
+
+await t('tapping the button opens the form for whoever tapped it', async () => {
+  assert.equal((await tap('UNEW')).status, 200);
+  const v = slack.views.at(-1);
+  assert.equal(v.trigger, 'tap-UNEW');
+  assert.equal(v.view.title.text, 'Join the directory');
+});
+
+await t('only once per person: Slack resending the event, or a quick leave-and-rejoin, shows nothing new', async () => {
+  const n = slack.ephemerals.length;
+  await joins('UNEW');
+  await joins('UNEW');
+  assert.equal(slack.ephemerals.length, n);
+});
+
+await t('no welcome for other channels, or for the bot itself', async () => {
+  const n = slack.ephemerals.length;
+  await joins('UOTHER', 'CRANDOM');
+  await joins('UBOT');
+  assert.equal(slack.ephemerals.length, n);
+});
+
+await t('a member who already has a listing gets Update your listing, and the button opens it filled in', async () => {
+  await joins('UANA');
+  assert.equal(buttonOf(slack.ephemerals.at(-1).blocks).text.text, 'Update your listing');
+  await tap('UANA');
+  assert.equal(slack.views.at(-1).view.title.text, 'Update your listing');
+});
+
+await t('/directory post: an approver posts the button in the channel for everyone already there', async () => {
+  const n = slack.posts.length;
+  const r = await (await formPost({ command: '/directory', text: 'post', user_id: 'UADMIN', trigger_id: 'trig-post', channel_id: 'CRANDOM' })).json();
+  assert.match(r.text, /Posted/);
+  assert.equal(slack.posts.length, n + 1);
+  assert.equal(slack.posts.at(-1).channel, 'CSITES');
+  assert.equal(buttonOf(slack.posts.at(-1).blocks).action_id, 'gdg_directory_open');
+  // Anyone else typing it just gets their form.
+  await formPost({ command: '/directory', text: 'post', user_id: 'UNEW', trigger_id: 'trig-x', channel_id: 'CRANDOM' });
+  assert.equal(slack.posts.length, n + 1);
+  assert.equal(slack.views.at(-1).trigger, 'trig-x');
+});
+
+await t('status page: /directory and the welcome button are ready with the new permissions, and it says how to fix it when not', async () => {
   let html = await (await STATUS()).text();
-  assert.match(html, /\/directory is ready\./);
-  slack.scopes = 'channels:history,reactions:read';
-  html = await (await STATUS()).text();
-  assert.match(html, /missing chat:write and commands/);
-  assert.match(html, /App Manifest/);
+  assert.match(html, /\/directory and the welcome button for new members are ready\./);
   slack.scopes = 'channels:history,reactions:read,chat:write,commands';
+  html = await (await STATUS()).text();
+  assert.match(html, /missing channels:read/);
+  assert.match(html, /App Manifest/);
+  slack.scopes = 'channels:history,channels:read,reactions:read,chat:write,commands';
 });
 
 clearInterval(keepAlive);

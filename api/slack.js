@@ -3,12 +3,13 @@
 //   (or, for a /directory submission, the listing with everything the member filled in).
 // The last approver ✅ removed → that message's links come off the site.
 // /directory opens a form to join or update your listing (see lib/directory.js).
+// Someone joining the channel gets a message only they can see, with a button that opens the form.
 // Work is idempotent, so Slack's automatic retries are harmless.
 // Each ✅, form and anything that goes wrong is noted in plain words for the status page.
 
-import { verify, explainSlackError } from '../lib/slack.js';
+import { verify, explainSlackError, botUserId } from '../lib/slack.js';
 import { publish, unpublish } from '../lib/library.js';
-import { logEvent } from '../lib/store.js';
+import { logEvent, claim } from '../lib/store.js';
 import * as directory from '../lib/directory.js';
 
 const list = (v, d = '') => (v ?? d).split(',').map((s) => s.trim()).filter(Boolean);
@@ -48,6 +49,7 @@ export async function POST(request) {
   if (body.type !== 'event_callback') return ok();
 
   const ev = body.event || {};
+  if (ev.type === 'member_joined_channel') return joined(ev, c);
   if (ev.type !== 'reaction_added' && ev.type !== 'reaction_removed') return ok();
   if (!c.emojis.includes(ev.reaction)) return ok(); // any other emoji: not ours, not noted
   if (ev.item?.type !== 'message') return ok();
@@ -80,7 +82,35 @@ export async function POST(request) {
   }
 }
 
+/** Someone joined the channel: show them the directory button, once. */
+async function joined(ev, c) {
+  if (!c.channel || ev.channel !== c.channel) return ok();
+  try {
+    if (ev.user === (await botUserId())) return ok();
+    // Slack may send the same event again; a quick leave-and-rejoin doesn't need a second welcome either.
+    if (!(await claim(`welcome:${ev.channel}:${ev.user}`, 3600))) return ok();
+    await directory.welcome(ev.user, ev.channel);
+    await logEvent({ ok: true, text: `${ev.user} joined the channel and got the directory button.` });
+  } catch (err) {
+    console.error(err);
+    await logEvent({ ok: false, text: `Couldn’t show ${ev.user} the directory button. ${explainSlackError(err)}` });
+  }
+  return ok();
+}
+
 async function form(params, c) {
+  // /directory post (approvers) → the button in the channel, for members already there
+  if (params.get('command') && /^\s*post\s*$/i.test(params.get('text') || '') && c.approvers.includes(params.get('user_id'))) {
+    if (!c.channel) return Response.json({ response_type: 'ephemeral', text: 'SLACK_CHANNEL_ID isn’t set yet.' });
+    try {
+      await directory.announce(c.channel);
+      await logEvent({ ok: true, text: `${params.get('user_id')} posted the directory button in the channel.` });
+      return Response.json({ response_type: 'ephemeral', text: `Posted in <#${c.channel}>.` });
+    } catch (err) {
+      await logEvent({ ok: false, text: `Couldn’t post the directory button. ${explainSlackError(err)}` });
+      return Response.json({ response_type: 'ephemeral', text: 'Sorry, that didn’t post. The status page says why.' });
+    }
+  }
   // /directory → open the form
   if (params.get('command')) {
     const user = params.get('user_id');
@@ -96,6 +126,14 @@ async function form(params, c) {
   // The form was submitted
   let payload;
   try { payload = JSON.parse(params.get('payload') || '{}'); } catch { return ok(); }
+  // The Join the directory button → open the form
+  if (payload.type === 'block_actions' && (payload.actions || []).some((a) => a.action_id === directory.OPEN_ACTION)) {
+    try { await directory.open(payload.trigger_id, payload.user?.id); } catch (err) {
+      console.error(err);
+      await logEvent({ ok: false, text: `The directory button couldn’t open the form for ${payload.user?.id}. ${explainSlackError(err)}` });
+    }
+    return ok();
+  }
   if (payload.type !== 'view_submission' || payload.view?.callback_id !== 'gdg_directory') return ok();
   const user = payload.user?.id;
   if (!c.channel) {

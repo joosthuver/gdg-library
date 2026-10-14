@@ -20,7 +20,7 @@ export const messages = {
 export const thread = { '200.9': { ts: '200.9', text: 'in a thread <https://thread.example/work>' } };
 export const reactions = {}; // ts -> [{name, users}]
 export const calls = [];
-export const slack = { posts: [], views: [], scopes: 'channels:history,reactions:read,chat:write,commands', nextTs: 300 }; // what the app sent to Slack
+export const slack = { posts: [], views: [], ephemerals: [], scopes: 'channels:history,channels:read,reactions:read,chat:write,commands', nextTs: 300 }; // what the app sent to Slack
 export const sheets = {}; // title -> { id, rows: [[...]] }  (row 0 = header)
 export const validations = []; // dropdowns set on the sheet
 export const sheetAccess = { readOnly: false }; // true: shared as Viewer, so every write is refused
@@ -61,7 +61,8 @@ globalThis.fetch = async (url, opts = {}) => {
     const p = Object.fromEntries(new URLSearchParams(typeof opts.body === 'string' ? opts.body : u.search));
     if (method === 'conversations.history') return Response.json({ ok: true, messages: messages[p.latest] ? [messages[p.latest]] : [] });
     if (method === 'conversations.replies') return Response.json({ ok: true, messages: thread[p.ts] ? [{ ts: '200.0', text: 'parent' }, thread[p.ts]] : [] });
-    if (method === 'auth.test') return Response.json({ ok: true, team: 'GDG', user: 'gdg_library' }, { headers: { 'x-oauth-scopes': slack.scopes } });
+    if (method === 'auth.test') return Response.json({ ok: true, team: 'GDG', user: 'gdg_library', user_id: 'UBOT' }, { headers: { 'x-oauth-scopes': slack.scopes } });
+    if (method === 'chat.postEphemeral') { slack.ephemerals.push(p); return Response.json({ ok: true }); }
     if (method === 'views.open') { slack.views.push({ trigger: p.trigger_id, view: JSON.parse(p.view) }); return Response.json({ ok: true }); }
     if (method === 'chat.postMessage') { const ts = `${slack.nextTs++}.0`; slack.posts.push({ ...p, ts }); return Response.json({ ok: true, channel: p.channel, ts }); }
     if (method === 'reactions.get') return Response.json({ ok: true, message: { reactions: reactions[p.timestamp] || [] } });
