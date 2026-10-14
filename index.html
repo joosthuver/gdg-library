@@ -17,8 +17,9 @@
 <style>
 @font-face{font-family:"ABC Areal";src:url(/fonts/ABCAreal-Medium.woff2) format("woff2");font-weight:500;font-style:normal;font-display:block}
 
-/* Layout: logo, live count and tools; then the sites as a Grid (image cards) or an Index (list);
-   a floating pill dock. Frosted panels: card details (+) and the info panel (Info pill). */
+/* Layout: logo, live count, Info and Apply; then the sites as a Grid (image cards) or an Index (list);
+   a floating pill dock (Light/Dark, Grid/Index, Latest/A–Z, search). Frosted panels: card details (+)
+   and the info panel (Info pill). */
 :root{
   --ground:#ffffff;
   --ink:#000000;
@@ -137,11 +138,15 @@ button{cursor:pointer}
   display:flex;align-items:center;justify-content:center;background:var(--btn);color:var(--ink);
   touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .more svg,.x svg{width:var(--icon);height:var(--icon);display:block}
+/* "Available for work": only shown when the sheet says Available. Same height and color as the round buttons. */
+.avail{position:absolute;top:0.55em;right:0.55em;z-index:2;height:var(--circle);padding:0 0.75em;border-radius:999px;
+  display:inline-flex;align-items:center;white-space:nowrap;background:var(--btn);color:var(--ink);pointer-events:none}
+.row .t .avail-i{color:var(--muted)}
 /* Small circles, full-size touch targets (44px minimum). */
 .more::before,.x::before{content:'';position:absolute;inset:-7px}
 @media (hover:hover){ .more:hover{background:var(--ink);color:var(--btn)} }
 /* While its panel is open, the card's own caption steps back so it can't ghost through the frost. */
-.card.open .cap > *,.card.open .more{visibility:hidden}
+.card.open .cap > *,.card.open .more,.card.open .avail{visibility:hidden}
 
 /* ——— Frosted panels ——— */
 .frost{
@@ -235,7 +240,7 @@ a.row:focus-visible{outline-offset:-1px}
     <p class="clock" id="clock" aria-label="Your local time"></p>
   </div>
   <div class="tools">
-    <button class="pill" id="theme" type="button">Light</button>
+    <button class="pill" id="info-open" type="button" aria-controls="info" aria-expanded="false">Info</button>
     <a class="pill apply-link" href="#">Apply</a>
   </div>
 </header>
@@ -247,13 +252,15 @@ a.row:focus-visible{outline-offset:-1px}
   <div class="copy">
     <p id="info-title">Global Design Group [GDG].<br>A digital collective of creatives from around the globe.</p>
     <p>What started as a bunch of friends from the creative industry connecting on Slack has grown into a global community of 200+ leading designers, directors and creatives. Still not taking ourselves too seriously.</p>
+    <p>This directory highlights a selection of our members.</p>
     <p class="meta">Font used: <span class="credit">Areal by Dinamo</span></p>
+    <p class="meta">All rights to the work and imagery displayed on this website remain with their respective creators, clients, and copyright holders.</p>
   </div>
   <button class="x" id="info-close" type="button" aria-label="Close"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.4" fill="none"/></svg></button>
 </section>
 
 <nav class="dock" aria-label="Index controls">
-  <button class="pill" id="info-open" type="button" aria-controls="info" aria-expanded="false">Info</button>
+  <button class="pill" id="theme" type="button">Light</button>
   <button class="pill strong" id="view" type="button">Grid</button>
   <button class="pill" id="sort" type="button">Latest</button>
   <label class="pill search"><span class="sr">Search the index</span><input id="q" type="search" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"></label>
@@ -418,7 +425,7 @@ a.row:focus-visible{outline-offset:-1px}
     const title = s.title || s.host;
     const a = el('a', 'hit');
     a.href = s.url; a.target = '_blank'; a.rel = 'noopener';
-    a.setAttribute('aria-label', [title, s.practice, s.location].filter(Boolean).join(', '));
+    a.setAttribute('aria-label', [title, s.practice, s.company, s.location, s.available && 'available for work'].filter(Boolean).join(', '));
 
     const media = el('div', 'media');
     const fb = el('div', 'fb');
@@ -433,6 +440,7 @@ a.row:focus-visible{outline-offset:-1px}
       img.onerror = () => img.remove(); // keep the text card
       media.append(img);
     }
+    if (s.available) media.append(el('span', 'avail', 'Available for work'));
     const cap = el('div', 'cap');
     cap.append(el('span', 't', title), el('span', 'p', s.practice || s.host));
     a.append(media, cap);
@@ -452,7 +460,9 @@ a.row:focus-visible{outline-offset:-1px}
     head.append(el('p', 't', title));
     const meta = el('div', 'meta');
     if (s.practice) meta.append(el('p', '', s.practice));
+    if (s.company) meta.append(el('p', '', s.company));
     if (s.location) meta.append(el('p', '', s.location));
+    if (s.available) meta.append(el('p', '', 'Available for work'));
     head.append(meta);
     const foot = el('div', 'foot');
     const visit = el('a', 'pill strong', 'Visit site');
@@ -594,7 +604,9 @@ a.row:focus-visible{outline-offset:-1px}
   function row(s) {
     const a = el('a', 'row grid12');
     a.href = s.url; a.target = '_blank'; a.rel = 'noopener';
-    a.append(el('span', 't', s.title || s.host), el('span', 'p', s.practice || ''), el('span', 'c', s.location || ''), el('span', 'h', s.host));
+    const name = el('span', 't', s.title || s.host);
+    if (s.available) name.append(el('span', 'avail-i', ' · Available'));
+    a.append(name, el('span', 'p', s.practice || ''), el('span', 'c', s.location || ''), el('span', 'h', s.host));
     if (s.image) a.dataset.image = s.image;
     return a;
   }
@@ -602,7 +614,7 @@ a.row:focus-visible{outline-offset:-1px}
   // ——— Render ———
   function visibleSites() {
     const q = query.trim().toLowerCase();
-    const rows = q ? sites.filter((s) => `${s.title} ${s.practice || ''} ${s.location || ''} ${s.country || ''} ${s.host}`.toLowerCase().includes(q)) : sites.slice();
+    const rows = q ? sites.filter((s) => `${s.title} ${s.practice || ''} ${s.company || ''} ${s.location || ''} ${s.country || ''} ${s.host} ${s.available ? 'available for work' : ''}`.toLowerCase().includes(q)) : sites.slice();
     rows.sort(sort === 'name'
       ? (a, b) => collator.compare(nameKey(a), nameKey(b))
       : (a, b) => (a.added < b.added ? 1 : a.added > b.added ? -1 : 0)); // the date is never shown; it only orders Latest
@@ -627,7 +639,7 @@ a.row:focus-visible{outline-offset:-1px}
     if (view === 'index' && rows.length) {
       const labels = el('div', 'row grid12 labels');
       labels.setAttribute('aria-hidden', 'true');
-      labels.append(el('span', 't', 'Site'), el('span', 'p', 'Practice'), el('span', 'c', 'Location'), el('span', 'h', 'Address'));
+      labels.append(el('span', 't', 'Name'), el('span', 'p', 'Title'), el('span', 'c', 'Location'), el('span', 'h', 'Address'));
       frag.append(labels);
     }
     if (!sites.length) frag.append(el('p', 'state', 'Nothing here yet.'));
@@ -738,7 +750,7 @@ a.row:focus-visible{outline-offset:-1px}
 
   // ——— Data ———
   const clean = (arr) => arr.filter((s) => s && /^https?:\/\//i.test(s.url));
-  const signature = (arr) => arr.map((s) => `${s.url}|${s.title}|${s.practice}|${s.location}|${s.country}|${s.image}`).join('\n');
+  const signature = (arr) => arr.map((s) => `${s.url}|${s.title}|${s.practice}|${s.company}|${s.location}|${s.country}|${s.available}|${s.image}`).join('\n');
   // Country can hold several ("Canada, Denmark"); each counts once. Matches lib/countries.js.
   const countryList = (v) => String(v || '').split(/\s*(?:,|;|\/|&|\band\b|\+)\s*/i).map((x) => x.trim().toLowerCase()).filter(Boolean);
   const countCountries = (arr) => new Set(arr.flatMap((s) => countryList(s.country))).size;

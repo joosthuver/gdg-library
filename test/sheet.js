@@ -1,7 +1,7 @@
 // Google Sheet sync + monthly check, end to end with everything mocked.
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { sheets, reactions, PRIVATE_PEM } from './mocks.js';
+import { sheets, reactions, validations, PRIVATE_PEM } from './mocks.js';
 
 Object.assign(process.env, {
   SLACK_SIGNING_SECRET: 'test-secret', SLACK_BOT_TOKEN: 'xoxb-test', APPROVERS: 'UADMIN', SLACK_CHANNEL_ID: 'CSITES',
@@ -24,6 +24,10 @@ const approve = (ts) => { reactions[ts] = [{ name: 'white_check_mark', users: ['
 const unapprove = (ts) => { reactions[ts] = []; return POST(react('reaction_removed', ts)); };
 const hosts = async () => (await (await SITES()).json()).sites.map((s) => s.host).sort();
 const rows = () => sheets.Sites.rows.slice(1);
+// Column positions of a freshly created Sites tab.
+const C = { name: 0, url: 1, title: 2, company: 3, location: 4, country: 5, availability: 6, image: 7, gallery: 8, added: 9, status: 10, checked: 11 };
+const HEADERS = ['Name', 'URL', 'Title', 'Company', 'Location', 'Country', 'Availability', 'Image', 'Gallery', 'Added', 'Status', 'Last checked'];
+const row = (o) => { const r = Array(12).fill(''); for (const [k, v] of Object.entries(o)) r[C[k]] = v; return r; };
 const urls = () => rows().map((r) => r[1]);
 const check = async (token = 'cron-secret') => CHECK(new Request('https://x/api/check', { headers: { authorization: `Bearer ${token}` } }));
 const lastLog = () => sheets.Checks.rows.at(-1);
@@ -39,10 +43,10 @@ console.log('Sheet sync + monthly check');
 
 await t('approving creates the Sites tab with headers and one row per link', async () => {
   await approve('100.1');
-  assert.deepEqual(sheets.Sites.rows[0], ['Title', 'URL', 'Practice', 'Location', 'Country', 'Image', 'Gallery', 'Added', 'Status', 'Last checked']);
+  assert.deepEqual(sheets.Sites.rows[0], HEADERS);
   assert.deepEqual(urls().sort(), ['https://mara.example/', 'https://www.ondine.example/']);
   const mara = rows().find((r) => r[1].includes('mara'));
-  assert.deepEqual(mara.slice(0, 9), ['Mara Lindqvist', 'https://mara.example/', '', '', '', '', '', '2025-10-09', 'Live']);
+  assert.deepEqual(mara, row({ name: 'Mara Lindqvist', url: 'https://mara.example/', added: '2025-10-09', status: 'Live' }));
 });
 
 await t('retrying the same approval adds no duplicate rows', async () => {
@@ -62,18 +66,20 @@ await t('check endpoint needs the cron secret', async () => {
 
 await t('check: a row typed into the sheet goes live; statuses + log written', async () => {
   await approve('100.3'); // north.example
-  sheets.Sites.rows.push(['Hand Added', 'https://hand.example/', 'Photographer', 'Santiago', 'Chile', '', '', '2024-02-01']);
+  sheets.Sites.rows.push(row({ name: 'Hand Added', url: 'https://hand.example/', title: 'Photographer', company: 'Hand Studio', location: 'Santiago', country: 'Chile', availability: 'Available', added: '2024-02-01' }));
   const r = await (await check()).json();
   assert.equal(r.addedToSite, 1);
   assert.deepEqual(await hosts(), ['hand.example', 'north.example']);
   const hand = rows().find((x) => x[1].includes('hand'));
-  assert.equal(hand[8], 'Added to site');
-  assert.match(hand[9], /^\d{4}-\d\d-\d\d$/);
-  assert.equal(rows().find((x) => x[1].includes('north'))[8], 'Live');
+  assert.equal(hand[C.status], 'Added to site');
+  assert.match(hand[C.checked], /^\d{4}-\d\d-\d\d$/);
+  assert.equal(rows().find((x) => x[1].includes('north'))[C.status], 'Live');
   assert.equal(lastLog()[4], 'In sync');
   const site = (await (await SITES()).json()).sites.find((s) => s.host === 'hand.example');
   assert.equal(site.title, 'Hand Added');
   assert.equal(site.practice, 'Photographer');
+  assert.equal(site.company, 'Hand Studio');
+  assert.equal(site.available, true);
   assert.equal(site.location, 'Santiago');
   assert.equal(site.country, 'Chile');
   assert.ok(site.added.startsWith('2024-02-01'));
@@ -101,7 +107,7 @@ await t('sheet outage during approval: site still updates, check appends the mis
   assert.ok(!urls().some((u) => u.includes('ondine')));
   const r = await (await check()).json();
   assert.equal(r.addedToSheet, 1);
-  assert.equal(rows().find((x) => x[1].includes('ondine'))[8], 'Added to sheet');
+  assert.equal(rows().find((x) => x[1].includes('ondine'))[C.status], 'Added to sheet');
   assert.ok((await hosts()).includes('ondine.example'), 'not removed');
 });
 
@@ -118,10 +124,10 @@ await t('sheet outage during un-approval: check deletes the leftover row, Slack 
 });
 
 await t('check: invalid and duplicate rows are flagged, not published', async () => {
-  sheets.Sites.rows.push(['Typo', 'not a link'], ['Dupe', 'https://www.hand.example']);
+  sheets.Sites.rows.push(row({ name: 'Typo', url: 'not a link' }), row({ name: 'Dupe', url: 'https://www.hand.example' }));
   await check();
-  assert.equal(rows().find((x) => x[1] === 'not a link')[8], 'Not a valid link');
-  assert.match(rows().find((x) => x[1] === 'https://www.hand.example')[8], /^Duplicate of row \d+$/);
+  assert.equal(rows().find((x) => x[1] === 'not a link')[C.status], 'Not a valid link');
+  assert.match(rows().find((x) => x[1] === 'https://www.hand.example')[C.status], /^Duplicate of row \d+$/);
   assert.equal((await hosts()).filter((h) => h === 'hand.example').length, 1);
 });
 
@@ -136,15 +142,17 @@ await t('check: an emptied sheet changes nothing and logs why', async () => {
   sheets.Sites.rows = saved;
 });
 
-await t('daily sync: practice, location, country, title and image edits reach live sites; nothing else changes', async () => {
+await t('daily sync: name, title, company, location, country, availability and image edits reach live sites; nothing else changes', async () => {
   const before = rows().length;
   const north = rows().find((x) => x[1].includes('north'));
-  north[0] = 'North Works'; north[2] = 'Studio'; north[3] = 'Toronto and Copenhagen'; north[4] = 'Canada, Denmark'; north[5] = 'https://img.example/north-cover.jpg';
+  Object.assign(north, { [C.name]: 'North Works', [C.title]: 'Studio', [C.company]: 'North & Co', [C.location]: 'Toronto and Copenhagen', [C.country]: 'Canada, Denmark', [C.availability]: 'available', [C.image]: 'https://img.example/north-cover.jpg' });
   const r = await (await CHECK(new Request('https://x/api/check?mode=sync', { headers: { authorization: 'Bearer cron-secret' } }))).json();
   assert.equal(r.updated, 1);
   const s = (await (await SITES()).json()).sites.find((x) => x.host === 'north.example');
   assert.equal(s.title, 'North Works');
   assert.equal(s.practice, 'Studio');
+  assert.equal(s.company, 'North & Co');
+  assert.equal(s.available, true, 'any capitalization of Available');
   assert.equal(s.location, 'Toronto and Copenhagen');
   assert.equal(s.country, 'Canada, Denmark');
   const list = await (await SITES()).json();
@@ -156,7 +164,7 @@ await t('daily sync: practice, location, country, title and image edits reach li
 await t('daily sync: Gallery links reach live sites, one per line or space-separated', async () => {
   const north = rows().find((x) => x[1].includes('north'));
   const before = (await (await SITES()).json()).sites.find((x) => x.host === 'north.example');
-  north[6] = 'https://img.example/w1.jpg\nhttps://img.example/w_10,h_20/w2.jpg  not-a-link';
+  north[C.gallery] = 'https://img.example/w1.jpg\nhttps://img.example/w_10,h_20/w2.jpg  not-a-link';
   const r = await (await CHECK(new Request('https://x/api/check?mode=sync', { headers: { authorization: 'Bearer cron-secret' } }))).json();
   assert.equal(r.updated, 1);
   const s = (await (await SITES()).json()).sites.find((x) => x.host === 'north.example');
@@ -167,10 +175,38 @@ await t('daily sync: Gallery links reach live sites, one per line or space-separ
 });
 
 await t('daily sync ignores rows that are not live yet', async () => {
-  sheets.Sites.rows.push(['Not yet', 'https://notyet.example/', 'Designer']);
+  sheets.Sites.rows.push(row({ name: 'Not yet', url: 'https://notyet.example/', title: 'Designer' }));
   await CHECK(new Request('https://x/api/check?mode=sync', { headers: { authorization: 'Bearer cron-secret' } }));
   assert.ok(!(await hosts()).includes('notyet.example'));
   sheets.Sites.rows.pop();
+});
+
+await t('daily sync: setting Availability to "Not available" takes the pill off', async () => {
+  rows().find((x) => x[1].includes('north'))[C.availability] = 'Not available';
+  await CHECK(new Request('https://x/api/check?mode=sync', { headers: { authorization: 'Bearer cron-secret' } }));
+  assert.equal((await (await SITES()).json()).sites.find((x) => x.host === 'north.example').available, false);
+});
+
+await t('columns are read by header name: reordering them in the sheet changes nothing', async () => {
+  const swap = (r) => { [r[C.location], r[C.country]] = [r[C.country], r[C.location]]; };
+  sheets.Sites.rows.forEach(swap); // the admin dragged Country before Location
+  const r = await (await CHECK(new Request('https://x/api/check?mode=sync', { headers: { authorization: 'Bearer cron-secret' } }))).json();
+  assert.equal(r.updated, 0, 'same data, nothing to update');
+  sheets.Sites.rows.forEach(swap);
+});
+
+await t('an older sheet (Title | URL | Practice | …) is upgraded in place, data kept', async () => {
+  const saved = sheets.Sites.rows;
+  validations.length = 0;
+  sheets.Sites.rows = [
+    ['Title', 'URL', 'Practice', 'Location', 'Country', 'Image', 'Gallery', 'Added', 'Status', 'Last checked'],
+    ['Hand Added', 'https://hand.example/', 'Photographer', 'Santiago', 'Chile', '', '', '2024-02-01', 'Live', '2026-10-01'],
+  ];
+  await CHECK(new Request('https://x/api/check?mode=sync', { headers: { authorization: 'Bearer cron-secret' } }));
+  assert.deepEqual(sheets.Sites.rows[0], HEADERS);
+  assert.deepEqual(sheets.Sites.rows[1], row({ name: 'Hand Added', url: 'https://hand.example/', title: 'Photographer', location: 'Santiago', country: 'Chile', added: '2024-02-01', status: 'Live', checked: '2026-10-01' }));
+  assert.ok(validations.some((v) => v.range.startColumnIndex === C.availability), 'Availability dropdown added');
+  sheets.Sites.rows = saved;
 });
 
 await t('admin token can run the check by hand', async () => {

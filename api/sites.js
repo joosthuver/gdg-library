@@ -1,4 +1,4 @@
-// Public list for the homepage. Newest first; only title, URL, host, practice, location, country, images and the (hidden) date go out.
+// Public list for the homepage. Newest first; only name, URL, host, title, company, location, country, availability, images and the (hidden) date go out.
 import * as store from '../lib/store.js';
 import { version, needsCapture } from '../lib/images.js';
 import { countCountries } from '../lib/countries.js';
@@ -12,7 +12,9 @@ export async function GET() {
         url: e.url,
         host: e.host,
         practice: e.practice || '',
+        company: e.company || '',
         location: e.location || '',
+        available: !!e.available,
         country: e.country || '',
         added: e.added, // not shown; orders Latest
         // Cover + up to 5 more, all of their work. Until captured, where to fetch them.

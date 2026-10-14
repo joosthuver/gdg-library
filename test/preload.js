@@ -38,7 +38,7 @@ console.log('Launch preload');
 
 await t('preload files agree: same nine sites, same order', async () => {
   const rows = parseCsv(csv);
-  assert.deepEqual(rows[0], ['Title', 'URL', 'Practice', 'Location', 'Country', 'Image', 'Gallery', 'Added', 'Status', 'Last checked']);
+  assert.deepEqual(rows[0], ['Name', 'URL', 'Title', 'Company', 'Location', 'Country', 'Availability', 'Image', 'Gallery', 'Added', 'Status', 'Last checked']);
   assert.equal(rows.length - 1, 9);
   assert.deepEqual(rows.slice(1).map((r) => r[0]), NAMES);
   assert.deepEqual(rows.slice(1).map((r) => r[1]), preload.sites.map((s) => s.url));
@@ -73,10 +73,10 @@ await t('import: Latest keeps the order the sites were sent in', async () => {
 
 await t('import: rows written to the sheet with Location and Country', async () => {
   const rows = sheets.Sites.rows;
-  assert.deepEqual(rows[0].slice(0, 5), ['Title', 'URL', 'Practice', 'Location', 'Country']);
+  assert.deepEqual(rows[0].slice(0, 6), ['Name', 'URL', 'Title', 'Company', 'Location', 'Country']);
   assert.equal(rows.length - 1, 9);
   const jordi = rows.find((r) => r[0] === 'Jordi van der Oord');
-  assert.deepEqual(jordi.slice(2, 5), ['Creative Director', 'Rotterdam', 'Netherlands']);
+  assert.deepEqual([jordi[2], jordi[4], jordi[5]], ['Creative Director', 'Rotterdam', 'Netherlands']);
 });
 
 await t('import: the monthly check afterwards changes nothing', async () => {
@@ -92,7 +92,7 @@ await t('paste: CSV rows typed into an empty sheet all go live on the next check
   await CHECK(new Request('https://x/api/check?mode=sync', { headers: { authorization: 'Bearer cron-secret' } })); // creates the tab + headers
   // Sheets stores "2026-10-09 09:08" as a date: hand it back as a serial number, as the API does.
   const serial = (s) => { const [d, hm] = s.split(' '); const [y, m, dd] = d.split('-').map(Number); const [h, mi] = hm.split(':').map(Number); return Date.UTC(y, m - 1, dd, h, mi) / 864e5 + 25569; };
-  for (const r of parseCsv(csv).slice(1)) sheets.Sites.rows.push([...r.slice(0, 7), serial(r[7])]);
+  for (const r of parseCsv(csv).slice(1)) sheets.Sites.rows.push([...r.slice(0, 9), serial(r[9])]);
   const res = await (await CHECK(new Request('https://x/api/check', { headers: { authorization: 'Bearer cron-secret' } }))).json();
   assert.equal(res.addedToSite, 9);
   const d = await list();
@@ -100,7 +100,7 @@ await t('paste: CSV rows typed into an empty sheet all go live on the next check
   assert.equal(d.countries, 5);
   assert.deepEqual(d.sites.map((s) => s.title), NAMES, 'order from the Added times');
   assert.ok(d.sites[0].added.startsWith('2026-10-09T09:08'), d.sites[0].added);
-  assert.equal(sheets.Sites.rows.find((r) => r[0] === 'Mike Sullivan')[8], 'Added to site');
+  assert.equal(sheets.Sites.rows.find((r) => r[0] === 'Mike Sullivan')[10], 'Added to site');
   assert.deepEqual(JSON.parse(hash.get('mister.studio')).picks, preload.sites.find((x) => x.title === 'Mike Sullivan').gallery, 'Gallery cell → the same images');
 });
 

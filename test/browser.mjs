@@ -38,6 +38,7 @@ const sites = Array.from({ length: 40 }, (_, i) => {
     title: `${NAMES[i % NAMES.length]} ${i < 20 ? 'Studio' : 'Works'}`,
     url: `https://${host}/`, host,
     practice: PRACTICES[i % PRACTICES.length], location: LOCATIONS[i % LOCATIONS.length], country: COUNTRIES[i % COUNTRIES.length],
+    company: i % 2 ? `${NAMES[(i + 3) % NAMES.length]} & Co` : '', available: i % 4 === 0,
     added: new Date(Date.UTC(2026, 9, 8) - i * day).toISOString(),
     image: `/test/fixtures/images/${String(img).padStart(2, '0')}.jpg`,
     ...(i % 3 === 0 ? { galleryUrl: `/api/gallery?id=${host}` } : { gallery: [`/test/fixtures/images/g/${String(img).padStart(2, '0')}-0.jpg`, `/test/fixtures/images/g/${String(img).padStart(2, '0')}-1.jpg`] }),
@@ -232,7 +233,7 @@ for (const [name, dev] of [['iPhone 15', VIEWPORTS['iPhone 15']], ['Laptop 1440'
   await p.reload(); await p.waitForSelector('a.row'); await p.waitForTimeout(800);
   check(g, 'reload keeps Index + A–Z (from the URL)', (await p.textContent('#view')) === 'Index' && (await p.textContent('#sort')) === 'A–Z');
   await tap(p, '#sort'); await p.waitForTimeout(900);
-  const dates = await p.evaluate(() => [...document.querySelectorAll('a.row .t')].map((e) => e.textContent));
+  const dates = await p.evaluate(() => [...document.querySelectorAll('a.row .t')].map((e) => e.firstChild.textContent));
   check(g, 'Latest puts the newest first', dates[0] === sites[0].title);
   await p.fill('#q', 'photographer'); await p.waitForTimeout(300);
   check(g, 'search matches practice', (await p.locator('a.row').count()) === sites.filter((s) => /photographer/i.test(s.practice)).length);
@@ -262,6 +263,65 @@ for (const [name, dev] of [['iPhone 15', VIEWPORTS['iPhone 15']], ['Laptop 1440'
   check(g, 'broken image falls back to the text card', await p.evaluate(() => [...document.querySelectorAll('.card')].some((c) => /3am Studio/.test(c.textContent) && !c.querySelector('img.slide'))));
   check(g, 'no errors in the console', errors.length === 0, errors.join(' | '));
   await ctx.close();
+}
+
+// ——— Joost's round: Info top right, Light/Dark in the dock, availability, company, Info lines ———
+for (const [vp, dev] of [['Mobile 390', VIEWPORTS['iPhone 15']], ['Desktop 1440', VIEWPORTS['Laptop 1440']]]) {
+  for (const scheme of ['light', 'dark']) {
+    const g = `Round 2 · ${vp} · ${scheme}`;
+    const { ctx, p, errors } = await open(dev, '', { scheme });
+    const r = await p.evaluate(() => {
+      const box = (e) => e.getBoundingClientRect();
+      const info = document.querySelector('#info-open'), apply = document.querySelector('.apply-link'), theme = document.querySelector('#theme');
+      const cards = [...document.querySelectorAll('.card')];
+      const withPill = cards.filter((c) => c.querySelector('.avail'));
+      const pill = withPill[0]?.querySelector('.avail'), media = withPill[0]?.querySelector('.media'), more = withPill[0]?.querySelector('.more');
+      const pb = pill && box(pill), mb = media && box(media), ob = more && box(more);
+      return {
+        infoInHeader: !!info.closest('.top .tools') && box(info).right <= box(apply).left + 1,
+        themeInDock: !!theme.closest('.dock') && theme === document.querySelector('.dock').firstElementChild,
+        pills: withPill.length, cards: cards.length,
+        pillText: pill?.textContent, pillTopRight: pb && Math.abs(pb.right - (mb.right - 0.55 * 16)) < 2 && pb.top - mb.top < 12,
+        pillClearOfMore: pb && ob && pb.bottom < ob.top,
+        pillSize: pill && getComputedStyle(pill).fontSize,
+        pillContrast: pill && [getComputedStyle(pill).color, getComputedStyle(pill).backgroundColor],
+      };
+    });
+    check(g, 'Info sits top right, before Apply', r.infoInHeader);
+    check(g, 'Light/Dark is the first pill in the dock', r.themeInDock);
+    check(g, '“Available for work” pill only on available members', r.pills === 10 && r.pillText === 'Available for work', `${r.pills} of ${r.cards}`);
+    check(g, 'pill sits top right of the image, clear of the + button', r.pillTopRight && r.pillClearOfMore);
+    check(g, 'pill text is 16px, pure black on white / white on black', r.pillSize === '16px' && (scheme === 'dark' ? r.pillContrast[0] === 'rgb(0, 0, 0)' || r.pillContrast[0] === 'rgb(255, 255, 255)' : r.pillContrast[0] === 'rgb(0, 0, 0)'), JSON.stringify(r.pillContrast));
+    await p.click('.card:nth-child(2) .more');
+    await p.waitForTimeout(450);
+    const meta = await p.textContent('.card:nth-child(2) .panel .meta');
+    check(g, '+ panel shows the company', /& Co/.test(meta), meta);
+    await p.click('.card:nth-child(2) .x');
+    await p.waitForTimeout(450);
+    await p.fill('#q', 'available');
+    await p.waitForTimeout(200);
+    check(g, 'searching “available” lists only available members', (await p.$$eval('.card', (c) => c.length)) === 10 && (await p.$$eval('.card .avail', (c) => c.length)) === 10);
+    await p.fill('#q', '& co');
+    await p.waitForTimeout(200);
+    check(g, 'search matches the company', (await p.$$eval('.card', (c) => c.length)) === 20);
+    await p.fill('#q', '');
+    await p.click('#view');
+    await p.waitForTimeout(400);
+    const idx = await p.evaluate(() => ({ labels: [...document.querySelectorAll('.row.labels span')].map((x) => x.textContent), marks: document.querySelectorAll('.row .avail-i').length }));
+    check(g, 'Index marks available members', idx.marks === 10);
+    if (vp.startsWith('Desktop')) check(g, 'Index headers read Name / Title / Location / Address', idx.labels.join('/') === 'Name/Title/Location/Address', idx.labels.join('/'));
+    await p.click('#view');
+    await p.click('#info-open');
+    await p.waitForTimeout(500);
+    const copy = await p.textContent('#info .copy');
+    check(g, 'Info has the directory line and the rights line', /This directory highlights a selection of our members\./.test(copy) && /All rights to the work and imagery displayed on this website remain with their respective creators, clients, and copyright holders\./.test(copy));
+    check(g, 'no errors in the console', errors.length === 0, errors.join(' | '));
+    if (scheme === 'light') await p.screenshot({ path: path.join(SHOTS, `round2-info-${vp.replace(/\s+/g, '-').toLowerCase()}.png`) });
+    await p.click('#info-close');
+    await p.waitForTimeout(500);
+    await p.screenshot({ path: path.join(SHOTS, `round2-${vp.replace(/\s+/g, '-').toLowerCase()}-${scheme}.png`) });
+    await ctx.close();
+  }
 }
 
 // ——— GDG logo: size, place, color in both modes ———

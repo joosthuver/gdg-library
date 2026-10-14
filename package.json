@@ -6,7 +6,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node test/run.js && node test/sheet.js && node test/images.js && node test/preload.js",
+    "test": "node test/run.js && node test/sheet.js && node test/images.js && node test/directory.js && node test/preload.js",
     "test:browser": "node test/browser.mjs"
   },
   "dependencies": {

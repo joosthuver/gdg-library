@@ -20,21 +20,26 @@ The site appears on the homepage as a card   →   and as a row in the Google Sh
 Once a month the site is checked against the sheet. The sheet wins.
 ```
 
-- **Approve:** an approver reacts ✅ to a message. Every link in it goes live within 30 seconds.
+- **Join with a form:** in Slack, a member types `/directory`. A short form asks for their site, name,
+  title, company, location, availability and (optionally) images of their work. It's posted in the
+  channel, and an approver's ✅ publishes it with everything filled in. Running `/directory` again
+  lets them update their own listing, e.g. their availability, without needing approval.
+- **Or approve a link:** an approver reacts ✅ to any message with a link. Every link in it goes live within 30 seconds.
 - **Un-approve:** remove the ✅. Those links come off the site and out of the sheet.
 - **Cards show work, never a screenshot of the site.** Each card holds up to 6 images. The first
   is the cover, and the rest play as a slideshow. They're found on the member's homepage
-  automatically, or chosen in the sheet's Gallery column. Each card shows the name, practice
-  and location.
-- **The sheet is the admin's control panel.** Fill in Practice, Location and Country there. Edits
+  automatically, or chosen in the form or the sheet's Gallery column. Each card shows the name and
+  title, plus an "Available for work" pill when they are. The + panel adds company and location.
+- **The sheet is the admin's control panel.** Anything a member didn't fill in can be added there. Edits
   to live sites reach the site the next morning. Rows added or deleted in the sheet are applied
   on the 1st of each month, or straight away by running the check by hand.
 - **Nothing private is shown:** no Slack names, message text or dates. The Apply email address is
   never shown on the page.
 - **On the page:**
   - **Header:** the logo, live counts of sites and countries, the visitor's time with its UTC
-    offset, Light/Dark, and Apply.
-  - **Dock:** Info, Grid/Index, A–Z/Latest, and search.
+    offset, Info and Apply.
+  - **Dock:** Light/Dark, Grid/Index, A–Z/Latest, and search (which also matches company,
+    and "available").
 
 ### What runs where
 
@@ -52,7 +57,7 @@ Once a month the site is checked against the sheet. The sheet wins.
 
 | When | What happens |
 |---|---|
-| Every day, around 9am New York | Sheet edits to live sites (Title, Practice, Location, Country, Image, Gallery) reach the site. Never adds or removes. |
+| Every day, around 9am New York | Sheet edits to live sites (Name, Title, Company, Location, Country, Availability, Image, Gallery) reach the site. Never adds or removes. |
 | 1st of the month, around 10am New York | Full check: rows added in the sheet go live, deleted rows come off, every row gets a Status. |
 
 ---
@@ -130,7 +135,7 @@ in the app dashboard, save, and reinstall the app.
    address as **Editor**.
 6. The sheet ID is the long string in the sheet's address, between `/d/` and `/edit`. That's `GOOGLE_SHEET_ID`.
 
-The app creates the `Sites` and `Checks` tabs, their headers and the Practice dropdown itself.
+The app creates the `Sites` and `Checks` tabs, their headers and the Title and Availability dropdowns itself.
 If Google blocks key creation (some company accounts do), use a personal Google account.
 
 ### Step 6 · Vercel: environment variables
@@ -164,7 +169,8 @@ In the Slack app dashboard → **Event Subscriptions → Request URL**, enter yo
 followed by `/api/slack`. Wait for **Verified ✓**, then **Save Changes**.
 
 Test it: post any portfolio link in the channel, react ✅ as an approver, and reload your Vercel
-address after 30 seconds. A card appears, and a row appears in the sheet. Remove the ✅ and both
+address after 30 seconds. Your Vercel address followed by `/api/status` shows whether each piece is set up
+and what happened to that ✅. A card appears, and a row appears in the sheet. Remove the ✅ and both
 go away. If anything fails, see Troubleshooting below.
 
 ### Step 8 · Add the launch sites
@@ -205,40 +211,61 @@ Once the index looks right on the Vercel address:
 - Only people in `APPROVERS` count, and only in `SLACK_CHANNEL_ID`.
 - A message with several links publishes all of them.
 - The same site posted twice becomes one card. It stays live while any approved message still links to it.
-- Names come from Slack's link preview, then the site's own title, then its address. Correct a
-  name in the sheet's Title column.
+- For a plain link, the name comes from Slack's link preview, then the site's own title, then its
+  address. Correct it in the sheet's Name column.
+- A `/directory` form posts as a message from the GDG Library app. Approving it works the same way: ✅
+  to publish, remove the ✅ to take it off.
 - Removing the ✅ always wins. To bring a site back, approve it again in Slack.
 - Slack's free plan only keeps 90 days of messages, so a ✅ on an older post does nothing. Add
   those sites in the sheet instead.
 
 ### The sheet
 
-`Sites` tab: **Title | URL | Practice | Location | Country | Image | Gallery | Added | Status | Last checked**
+`Sites` tab: **Name | URL | Title | Company | Location | Country | Availability | Image | Gallery | Added | Status | Last checked**
+
+The app finds columns by their header, so you can reorder them or add your own columns. Just keep
+the header names as they are.
 
 | Column | What goes there | Shown on the site? |
 |---|---|---|
-| Title | The person's or studio's name | Yes |
+| Name | The person's or studio's name | Yes |
 | URL | Their site | Yes, as the link |
-| Practice | What they do: Designer, Creative Director, Photographer… Pick from the dropdown or type anything | Yes. Until it's filled in, the card shows the address |
-| Location | Where they're based, as it should read: "Toronto and Copenhagen" | Yes |
+| Title | What they do: Designer, Creative Director, Photographer… Pick from the dropdown or type anything | Yes. Until it's filled in, the card shows the address |
+| Company | Where they work, if anywhere | Yes, in the + panel |
+| Location | Where they're based, as it should read: "Toronto and Copenhagen" | Yes, in the + panel |
 | Country | Feeds the country count. Several are fine: "Canada, Denmark". Keep spellings consistent ("United Kingdom", never sometimes "UK") | No |
+| Availability | "Available" shows an "Available for work" pill on their card. Blank or "Not available" shows nothing | Yes, as the pill |
 | Image | Optional: one image address to use as the cover | Yes, as the cover |
 | Gallery | Optional: up to 6 image addresses of their work, one per line. They replace the images found on the site. If Image is empty, the first one is the cover | Yes, in the card's slideshow |
 | Added | Filled in automatically. Only orders Latest | No |
 | Status, Last checked | Written by the app. Don't edit | No |
 
-- **Edit a live site** (any of the first seven columns) → on the site the next morning.
+- **Edit a live site** (any column from Name to Gallery) → on the site the next morning.
+- **Members' own edits** with `/directory` are written to their row too, so the sheet always matches the site.
 - **Add a row** → goes live on the 1st of the month.
 - **Delete a row** → comes off on the 1st of the month.
 - **Apply changes now:** Vercel → **Settings → Cron Jobs → Run** `/api/check`.
 - **Clear the Gallery cell** → the card goes back to images found on the site.
 - **Getting image addresses:** on the member's site, right-click an image → **Copy Image Address**.
-  The address has to open the image itself, publicly. Members can also post their picks with their
-  link in Slack for the admin to paste in.
+  The address has to open the image itself, publicly. Members can also add their picks themselves
+  with `/directory`.
 - A row that isn't a link, or repeats another row, is flagged in Status and skipped.
 - If the sheet ever comes back empty, the check changes nothing and logs why, so the site can't be
   wiped by accident.
 - The `Checks` tab gets one line per monthly run: what was added and what was removed.
+
+### /directory
+
+What members see: `/directory` in any Slack channel or DM opens a form only they can see.
+
+| Who submits | What happens |
+|---|---|
+| Someone new | Their listing is posted in the channel. An approver's ✅ publishes it, and they become its owner |
+| The owner of a live listing | Their changes are saved straight away, to the site and the sheet. No approval needed |
+| Anyone else, for a site already listed (e.g. a launch site) | Posted in the channel as an update. An approver's ✅ replaces the details and makes them the owner |
+
+Owners can't be changed by hand. To hand a listing to someone, they submit `/directory` and an
+approver ✅s it.
 
 ### Changing things
 
@@ -252,17 +279,35 @@ Any change committed to GitHub redeploys the site within a minute.
 
 ### Troubleshooting
 
-Vercel → project → **Logs** shows every Slack, Sheets and storage error.
+**Start with the status page:** your site's address followed by `/api/status`, e.g. `gdg-library.vercel.app/api/status`.
+It shows a ✓ or ✗ for each piece (database, image storage, sheet, Slack, approvers, the /directory form, schedule),
+says what to do about each ✗, and lists the last few ✅ and forms from Slack and what happened to each. It never
+shows the settings' values.
+For anything it doesn't explain, Vercel → project → **Logs** has the full errors.
 
 | Problem | Check |
 |---|---|
 | ✅ does nothing | The reactor's ID is in `APPROVERS`; the bot is in the channel (`/invite @GDG Library`); `SLACK_CHANNEL_ID` is that channel; the message is under 90 days old; the Request URL shows Verified |
+| Slack says `/directory` "is not a valid command", or "dispatch_failed" | The Slack app needs the updated manifest (see "Updating the Slack app" below); the status page shows this as ✗ /directory form |
 | A card appears but the sheet doesn't update | The sheet is shared with the service account as **Editor**; `GOOGLE_PRIVATE_KEY` was pasted whole; the Sheets API is enabled |
 | A card shows just the name | No usable images were found on the site (it's looked at again after a week), or the 50-a-day limit for sites built in JavaScript was reached (it fills in on a later visit). Paste image addresses in the Gallery column to fix it for good |
 | A card shows the wrong images | Paste the right ones in the Gallery column |
 | The page says "unavailable" | Redis is connected to the project (step 3) and the project was redeployed afterwards |
 | A new site takes a while to appear | The list is cached for 30 seconds |
 | The wrong font | The `fonts/` folder is missing from the repository |
+
+### Updating the Slack app (once, for /directory)
+
+The form needs two more Slack permissions and two settings, all in `slack-manifest.json`. A Slack
+admin does this once:
+
+1. Slack's app dashboard → **GDG Library → App Manifest** → switch to JSON, replace everything with
+   the contents of `slack-manifest.json` → **Save Changes**. If Slack asks to verify the URL, it's
+   `https://globaldesign.group/api/slack`.
+2. **Install App → Reinstall to Workspace → Allow.**
+3. If the **Bot User OAuth Token** shown there changed, paste the new one into `SLACK_BOT_TOKEN` in
+   Vercel and redeploy.
+4. Open the status page. **/directory form** should show ✓. Then type `/directory` in Slack.
 
 ---
 
@@ -279,6 +324,8 @@ api/cover.js          a card's cover    } a card's images are captured together 
 api/gallery.js        a card's gallery  } first view and stored in Blob
 api/check.js          monthly check and daily sync (Vercel Cron)
 api/import.js         bulk add / remove (Authorization: Bearer ADMIN_TOKEN)
+api/status.js         the setup check page: each piece ✓ / ✗ and recent Slack activity
+lib/directory.js      the /directory form: open, check, post for ✅ or save the owner's changes
 lib/                  Slack, Redis, Sheets, card images, page metadata, country count
 preload/              the launch sites, as CSV (for the sheet) and JSON (for /api/import)
 slack-manifest.json   the Slack app definition
@@ -297,9 +344,9 @@ curl -X POST "<your Vercel address>/api/import" \
 
 Tests need Node 20 or newer; run `npm install` first.
 
-- `npm test`: 58 backend tests covering Slack events, the sheet sync and monthly check, card
+- `npm test`: 76 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
   images and the preload, with all outside services mocked.
-- `npm run test:browser`: 346 checks in Chromium across phones, tablet and desktop up to 2560,
+- `npm run test:browser`: 392 checks in Chromium across phones, tablet and desktop up to 2560,
   light and dark, reduced motion, GSAP missing, an empty index and the API being down.
   Screenshots go to `test/shots/`. It needs Playwright's Chromium (`npx playwright install chromium`)
   or `CHROMIUM_PATH`. Check on a real iPhone in Safari before launch.

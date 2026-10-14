@@ -1,27 +1,47 @@
 {
   "display_information": {
     "name": "GDG Library",
-    "description": "Publishes ✅-approved links from the channel to globaldesign.group",
+    "description": "Publishes ✅-approved sites from the channel to globaldesign.group. /directory to join or update your listing.",
     "background_color": "#111111"
   },
   "features": {
     "bot_user": {
       "display_name": "GDG Library",
       "always_online": false
-    }
+    },
+    "slash_commands": [
+      {
+        "command": "/directory",
+        "url": "https://globaldesign.group/api/slack",
+        "description": "Join the GDG directory, or update your listing",
+        "should_escape": false
+      }
+    ]
   },
   "oauth_config": {
     "scopes": {
-      "bot": ["channels:history", "reactions:read"]
+      "bot": [
+        "channels:history",
+        "reactions:read",
+        "chat:write",
+        "commands"
+      ]
     }
   },
   "settings": {
     "event_subscriptions": {
       "request_url": "https://globaldesign.group/api/slack",
-      "bot_events": ["reaction_added", "reaction_removed"]
+      "bot_events": [
+        "reaction_added",
+        "reaction_removed"
+      ]
     },
     "org_deploy_enabled": false,
     "socket_mode_enabled": false,
-    "token_rotation_enabled": false
+    "token_rotation_enabled": false,
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "https://globaldesign.group/api/slack"
+    }
   }
 }

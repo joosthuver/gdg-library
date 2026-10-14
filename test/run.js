@@ -10,11 +10,13 @@ process.env.KV_REST_API_URL = 'https://redis.test';
 process.env.KV_REST_API_TOKEN = 'redis-token';
 process.env.ADMIN_TOKEN = 'admin-token';
 
-import { hash, messages, thread, reactions, calls } from './mocks.js';
+import { hash, messages, thread, reactions, calls, lists } from './mocks.js';
 
 const { POST, GET } = await import('../api/slack.js');
 const { GET: SITES } = await import('../api/sites.js');
 const { POST: IMPORT } = await import('../api/import.js');
+const { GET: STATUS } = await import('../api/status.js');
+const { explainSlackError } = await import('../lib/slack.js');
 
 function signed(body, { secret = 'test-secret', ts = Math.floor(Date.now() / 1000) } = {}) {
   const raw = JSON.stringify(body);
@@ -145,6 +147,59 @@ await t('Redis failure returns 500 so Slack retries', async () => {
   const r = await POST(react('reaction_added', 'UADMIN', '100.1'));
   globalThis.fetch = real;
   assert.equal(r.status, 500);
+});
+
+// ——— Status page + Slack activity in plain words ———
+const log = () => (lists['gdg:sites:slack-log'] || []).map((x) => JSON.parse(x).text);
+
+await t('Slack activity: each ✅ is noted in plain words (approver, non-approver, other channel, bad secret)', async () => {
+  delete lists['gdg:sites:slack-log'];
+  await POST(react('reaction_added', 'USTRANGER', '100.3'));
+  await POST(react('reaction_added', 'UADMIN', '100.3', 'white_check_mark', 'COTHER'));
+  await POST(react('reaction_added', 'UADMIN', '100.3'));
+  await POST(signed({ type: 'event_callback', event: {} }, { secret: 'wrong' }));
+  await POST(react('reaction_added', 'USTRANGER', '100.3', 'heart'));
+  const l = log();
+  assert.equal(l.length, 4, 'other emoji not noted');
+  assert.match(l[3], /USTRANGER, who isn’t in APPROVERS/);
+  assert.match(l[2], /another channel \(COTHER\)/);
+  assert.match(l[1], /added north\.example/);
+  assert.match(l[0], /SLACK_SIGNING_SECRET doesn’t match/);
+});
+
+await t('Slack activity keeps only the last 10', async () => {
+  for (let i = 0; i < 12; i++) await POST(react('reaction_added', 'USTRANGER', '100.3'));
+  assert.equal(log().length, 10);
+});
+
+await t('Slack errors are explained in words the admin can act on', async () => {
+  assert.match(explainSlackError(new Error('Slack conversations.history: not_in_channel')), /\/invite @GDG Library/);
+  assert.match(explainSlackError(new Error('Slack auth.test: invalid_auth')), /SLACK_BOT_TOKEN is wrong/);
+});
+
+await t('status page: ✓ / ✗ per piece with what to do, latest Slack activity, never a secret value', async () => {
+  const r = await STATUS();
+  assert.equal(r.headers.get('cache-control'), 'no-store');
+  const html = await r.text();
+  const line = (name) => html.split(`<b>${name}</b>`)[0].split('<li class="').pop().slice(0, 2);
+  assert.equal(line('Database'), 'ok');
+  assert.equal(line('Slack app'), 'ok');
+  assert.match(html, /Connected to the GDG workspace/);
+  assert.equal(line('Slack channel'), 'ok');
+  assert.equal(line('Google Sheet'), 'no');
+  assert.match(html, /Missing in Vercel: GOOGLE_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY/);
+  assert.equal(line('Approvers'), 'no', 'UADMIN is too short to be a real member ID');
+  assert.match(html, /isn’t in APPROVERS/);
+  for (const secret of ['xoxb-test', 'test-secret', 'redis-token', 'admin-token']) assert.ok(!html.includes(secret), secret);
+});
+
+await t('status page: a fully set-up site says so', async () => {
+  const before = { ...process.env };
+  Object.assign(process.env, { APPROVERS: 'U012AB3CD,U045EF6GH', BLOB_READ_WRITE_TOKEN: 'b', CRON_SECRET: 'c', GOOGLE_SHEET_ID: 'SHEET1', GOOGLE_SERVICE_ACCOUNT_EMAIL: 'gdg@test.iam.gserviceaccount.com', GOOGLE_PRIVATE_KEY: (await import('./mocks.js')).PRIVATE_PEM });
+  const html = await (await STATUS()).text();
+  for (const k of Object.keys(process.env)) if (!(k in before)) delete process.env[k];
+  Object.assign(process.env, before);
+  assert.match(html, /Everything is set up\./, html.match(/<li class="no">.*?<\/li>/)?.[0]);
 });
 
 await t('countries are counted once each, case-insensitively, several per site allowed', async () => {

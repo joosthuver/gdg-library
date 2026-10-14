@@ -1,6 +1,7 @@
 // POST /api/import (admin only, Authorization: Bearer ADMIN_TOKEN)
 // Bulk add or remove sites, e.g. the launch preload or links older than Slack's history.
-// Body: { sites: [{ url, title?, practice?, location?, country?, image?, gallery?: [url], added? }], remove: [url] }
+// Body: { sites: [{ url, title?, practice?, company?, location?, country?, available?, image?, gallery?: [url], added? }], remove: [url] }
+// title = the person's name, practice = what they do (the sheet's Name and Title columns).
 // Changes are written to the sheet too.
 
 import crypto from 'node:crypto';
@@ -25,7 +26,7 @@ export async function POST(request) {
 
   const items = (body.sites || []).filter((s) => valid(s?.url)).map((s) => {
     const d = s.added ? new Date(s.added) : new Date();
-    return { url: s.url, title: s.title, practice: typeof s.practice === 'string' ? s.practice.trim() : undefined, location: typeof s.location === 'string' ? s.location.trim() : undefined, country: typeof s.country === 'string' ? s.country.trim() : undefined, image: /^https:\/\//.test(s.image || '') ? s.image : undefined, picks: s.gallery ? parseGallery(s.gallery) : undefined, added: (isNaN(d) ? new Date() : d).toISOString(), timeout: 4000 };
+    return { url: s.url, title: s.title, practice: typeof s.practice === 'string' ? s.practice.trim() : undefined, company: typeof s.company === 'string' ? s.company.trim() : undefined, location: typeof s.location === 'string' ? s.location.trim() : undefined, available: typeof s.available === 'boolean' ? s.available : undefined, country: typeof s.country === 'string' ? s.country.trim() : undefined, image: /^https:\/\//.test(s.image || '') ? s.image : undefined, picks: s.gallery ? parseGallery(s.gallery) : undefined, added: (isNaN(d) ? new Date() : d).toISOString(), timeout: 4000 };
   });
   if (items.length) await addSites(items, 'import');
 
