@@ -350,3 +350,4 @@ Tests need Node 20 or newer; run `npm install` first.
   light and dark, reduced motion, GSAP missing, an empty index and the API being down.
   Screenshots go to `test/shots/`. It needs Playwright's Chromium (`npx playwright install chromium`)
   or `CHROMIUM_PATH`. Check on a real iPhone in Safari before launch.
+
