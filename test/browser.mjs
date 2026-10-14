@@ -232,6 +232,15 @@ for (const [name, dev] of [['iPhone 15', VIEWPORTS['iPhone 15']], ['Laptop 1440'
       return out;
     });
     check(g, 'mouse: no flash of the text card while flipping', samples.every((o) => o > 0.99), samples.map((o) => o.toFixed(2)).join(' '));
+    // After many flips, the images still sit under the + button and the open panel.
+    for (let k = 0; k < 8; k++) { await p.mouse.move(m.x + 5, m.y + m.height / 2); await p.mouse.move(m.x + m.width - 5, m.y + m.height / 2, { steps: 4 }); }
+    await p.waitForTimeout(500);
+    const onTop = async (sel) => p.evaluate((q) => { const e = document.querySelector(q); const b = e.getBoundingClientRect(); return e.contains(document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)); }, sel);
+    const plusOk = await onTop('.card:nth-child(2) .more');
+    await p.click('.card:nth-child(2) .more'); await p.waitForTimeout(700);
+    const panelOk = await onTop('.card:nth-child(2) .panel .pill.strong');
+    check(g, 'mouse: after many flips, images stay under the + and the open panel', plusOk && panelOk, `+ ${plusOk}, panel ${panelOk}`);
+    await p.click('.card:nth-child(2) .more').catch(() => {}); await p.waitForTimeout(500);
     await p.mouse.move(m.x + m.width / 2, m.y - 60); await p.waitForTimeout(400);
   }
 

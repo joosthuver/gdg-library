@@ -1,7 +1,7 @@
 {
   "display_information": {
     "name": "GDG Library",
-    "description": "Publishes ✅-approved sites from the channel to globaldesign.group. New members get a button to join; /directory to join or update a listing.",
+    "description": "Publishes ✅-approved sites from the channel to globaldesign.group. /directory to join or update a listing.",
     "background_color": "#111111"
   },
   "features": {

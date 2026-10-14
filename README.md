@@ -358,7 +358,7 @@ Tests need Node 20 or newer; run `npm install` first.
 
 - `npm test`: 90 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
   images and the preload, with all outside services mocked.
-- `npm run test:browser`: 401 checks in Chromium across phones, tablet and desktop up to 2560,
+- `npm run test:browser`: 402 checks in Chromium across phones, tablet and desktop up to 2560,
   light and dark, reduced motion, GSAP missing, an empty index and the API being down.
   Screenshots go to `test/shots/`. It needs Playwright's Chromium (`npx playwright install chromium`)
   or `CHROMIUM_PATH`. Check on a real iPhone in Safari before launch.
