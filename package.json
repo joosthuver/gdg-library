@@ -10,7 +10,8 @@
     "test:browser": "node test/browser.mjs"
   },
   "dependencies": {
-    "@vercel/blob": "2.8.0"
+    "@vercel/blob": "2.8.0",
+    "@vercel/functions": "3.9.9"
   },
   "devDependencies": {
     "playwright": "1.64.0"

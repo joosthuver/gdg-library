@@ -1,7 +1,7 @@
 // Google Sheet sync + monthly check, end to end with everything mocked.
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { sheets, reactions, validations, PRIVATE_PEM } from './mocks.js';
+import { sheets, reactions, validations, resetClaims, hash, PRIVATE_PEM } from './mocks.js';
 
 Object.assign(process.env, {
   SLACK_SIGNING_SECRET: 'test-secret', SLACK_BOT_TOKEN: 'xoxb-test', APPROVERS: 'UADMIN', SLACK_CHANNEL_ID: 'CSITES',
@@ -207,6 +207,22 @@ await t('an older sheet (Title | URL | Practice | …) is upgraded in place, dat
   assert.deepEqual(sheets.Sites.rows[1], row({ name: 'Hand Added', url: 'https://hand.example/', title: 'Photographer', location: 'Santiago', country: 'Chile', added: '2024-02-01', status: 'Live', checked: '2026-10-01' }));
   assert.ok(validations.some((v) => v.range.startColumnIndex === C.availability), 'Availability dropdown added');
   sheets.Sites.rows = saved;
+});
+
+await t('serving the list syncs sheet edits in the background, at most every 10 minutes', async () => {
+  const { freshen } = await import('../api/sites.js');
+  await new Promise((r) => setTimeout(r, 50)); // let earlier background syncs finish
+  resetClaims();
+  const north = rows().find((x) => x[1].includes('north'));
+  north[C.gallery] = 'https://img.example/g1.jpg\nhttps://img.example/g2.jpg';
+  await freshen();
+  assert.deepEqual(JSON.parse(hash.get('north.example')).picks, ['https://img.example/g1.jpg', 'https://img.example/g2.jpg'], 'Gallery links picked up without waiting for the morning');
+  north[C.title] = 'Changed again';
+  await freshen();
+  assert.notEqual(JSON.parse(hash.get('north.example')).practice, 'Changed again', 'not twice within 10 minutes');
+  resetClaims();
+  await freshen();
+  assert.equal(JSON.parse(hash.get('north.example')).practice, 'Changed again', 'next window: synced');
 });
 
 await t('admin token can run the check by hand', async () => {

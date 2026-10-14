@@ -9,6 +9,7 @@ export const PRIVATE_PEM = privateKey.export({ type: 'pkcs8', format: 'pem' });
 export const hash = new Map(); // the sites hash
 const other = {}; // any other Redis hash (locks)
 export const lists = {}; // Redis lists (the Slack activity log)
+export const resetClaims = () => other.__kv?.clear(); // forget "synced recently"
 export const messages = {
   '100.1': { ts: '100.1', text: 'New site! <https://www.ondine.example/?utm_source=slack|ondine.example> and <https://mara.example>' },
   '100.2': { ts: '100.2', text: 'no links here' },
@@ -46,6 +47,7 @@ globalThis.fetch = async (url, opts = {}) => {
       if (cmd === 'LPUSH') { const l = (lists[key] ||= []); l.unshift(...a); return { result: l.length }; }
       if (cmd === 'LTRIM') { lists[key] = (lists[key] || []).slice(Number(a[0]), Number(a[1]) + 1); return { result: 'OK' }; }
       if (cmd === 'LRANGE') return { result: (lists[key] || []).slice(Number(a[0]), Number(a[1]) + 1) };
+      if (cmd === 'SET') { const kv = (other['__kv'] ||= new Map()); if (a.includes('NX') && kv.has(key)) return { result: null }; kv.set(key, a[0]); return { result: 'OK' }; }
       if (cmd === 'HDEL') { let n = 0; for (const f of a) n += h.delete(f) ? 1 : 0; return { result: n }; }
       return { error: 'unknown' };
     });

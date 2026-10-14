@@ -8,10 +8,19 @@
 <meta name="theme-color" content="#0e0e0e" media="(prefers-color-scheme: dark)">
 <title>Global Design Group</title>
 <meta name="description" content="A digital collective of creatives from around the globe. An index of sites shared by our members.">
+<link rel="canonical" href="https://globaldesign.group/">
+<meta property="og:site_name" content="Global Design Group">
+<meta property="og:url" content="https://globaldesign.group/">
 <meta property="og:title" content="Global Design Group">
 <meta property="og:description" content="A digital collective of creatives from around the globe. An index of sites shared by our members.">
 <meta property="og:type" content="website">
+<meta property="og:image" content="https://globaldesign.group/share-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Global Design Group">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preload" href="/fonts/ABCAreal-Medium.woff2" as="font" type="font/woff2" crossorigin>
 <script>try{var t=localStorage.getItem('gdg-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <style>
@@ -122,7 +131,7 @@ button{cursor:pointer}
 .media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
 .media img.slide{opacity:0}
 .media img.slide.on{opacity:1}
-/* Shown until the image arrives, and kept if there is none. */
+/* Only on a site without images. */
 .fb{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:0.85em 1em}
 .fb .p{color:var(--muted)}
 .cap{display:flex;justify-content:space-between;align-items:baseline;gap:1em;padding:0.86em calc(1.15em + var(--circle)) 0.8em 1em}
@@ -428,21 +437,24 @@ a.row:focus-visible{outline-offset:-1px}
     a.setAttribute('aria-label', [title, s.practice, s.company, s.location, s.available && 'available for work'].filter(Boolean).join(', '));
 
     const media = el('div', 'media');
-    const fb = el('div', 'fb');
-    fb.setAttribute('aria-hidden', 'true');
-    fb.append(el('span', 't', title), el('span', 'p', s.practice || s.host));
-    media.append(fb);
+    // The text card is only for a site without images, so nothing ever shows behind the work.
+    const textCard = () => {
+      const fb = el('div', 'fb');
+      fb.setAttribute('aria-hidden', 'true');
+      fb.append(el('span', 't', title), el('span', 'p', s.practice || ''));
+      media.prepend(fb);
+    };
     if (s.image) {
       const img = el('img', 'slide on');
       img.alt = ''; img.decoding = 'async'; img.loading = i < 3 ? 'eager' : 'lazy';
       img.width = 1440; img.height = 900;
       setImage(img, s.image);
-      img.onerror = () => img.remove(); // keep the text card
+      img.onerror = () => { img.remove(); textCard(); };
       media.append(img);
-    }
+    } else textCard();
     if (s.available) media.append(el('span', 'avail', 'Available for work'));
     const cap = el('div', 'cap');
-    cap.append(el('span', 't', title), el('span', 'p', s.practice || s.host));
+    cap.append(el('span', 't', title), el('span', 'p', s.practice || ''));
     a.append(media, cap);
 
     const more = el('button', 'more');
@@ -516,21 +528,39 @@ a.row:focus-visible{outline-offset:-1px}
     st.slides = slides;
     st.loading = false;
   }
+  const ready = (img) => img.complete && img.naturalWidth > 0;
   function show(art, idx) {
     const st = cardState.get(art);
-    if (!st.slides || idx === st.index || !st.slides[idx]) return;
-    const prev = st.slides[st.index], next = st.slides[idx];
+    if (!st.slides || !st.slides[idx]) return;
+    st.want = idx;
+    if (idx === st.index) return;
+    const next = st.slides[idx];
+    if (!ready(next)) {
+      // Not loaded yet: stay on the current image (never flash the card behind it), then flip once it arrives
+      // if the pointer still wants it.
+      next.addEventListener('load', () => { if (st.want === idx) show(art, idx); }, { once: true });
+      return;
+    }
+    const prev = st.slides[st.index];
     st.index = idx;
+    // The new image goes on top; the old one stays fully visible underneath until the new one is in.
+    st.z = (st.z || 1) + 1;
+    next.style.zIndex = st.z;
+    // Once the new image is in, every other image steps back (also any left over from an interrupted flip).
+    const settle = () => {
+      if (st.slides[st.index] !== next) return;
+      for (const s of st.slides) if (s !== next && s.classList.contains('on')) { s.classList.remove('on'); G?.set?.(s, { clearProps: 'opacity' }); }
+    };
     if (motion()) {
       // Quick swap: the new image fades in over a slight, eased zoom.
       G.killTweensOf([prev, next]);
+      if (prev) G.set(prev, { opacity: 1 });
       next.classList.add('on');
-      G.fromTo(next, { opacity: 0, filter: 'blur(3px)' }, { opacity: 1, filter: 'blur(0px)', duration: 0.26, ease: 'power2.out', clearProps: 'filter' });
+      G.fromTo(next, { opacity: 0, filter: 'blur(3px)' }, { opacity: 1, filter: 'blur(0px)', duration: 0.26, ease: 'power2.out', clearProps: 'filter', onComplete: settle });
       G.fromTo(next, { scale: 1.04 }, { scale: 1, duration: 0.7, ease: 'power3.out', clearProps: 'transform' });
-      if (prev) G.to(prev, { opacity: 0, duration: 0.22, ease: 'power1.out', onComplete: () => { prev.classList.remove('on'); G.set(prev, { clearProps: 'opacity' }); } });
     } else {
-      prev?.classList.remove('on');
       next.classList.add('on');
+      settle();
     }
   }
 

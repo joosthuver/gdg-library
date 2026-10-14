@@ -31,7 +31,7 @@ Once a month the site is checked against the sheet. The sheet wins.
   automatically, or chosen in the form or the sheet's Gallery column. Each card shows the name and
   title, plus an "Available for work" pill when they are. The + panel adds company and location.
 - **The sheet is the admin's control panel.** Anything a member didn't fill in can be added there. Edits
-  to live sites reach the site the next morning. Rows added or deleted in the sheet are applied
+  to live sites reach the site within about 10 minutes. Rows added or deleted in the sheet are applied
   on the 1st of each month, or straight away by running the check by hand.
 - **Nothing private is shown:** no Slack names, message text or dates. The Apply email address is
   never shown on the page.
@@ -57,7 +57,8 @@ Once a month the site is checked against the sheet. The sheet wins.
 
 | When | What happens |
 |---|---|
-| Every day, around 9am New York | Sheet edits to live sites (Name, Title, Company, Location, Country, Availability, Image, Gallery) reach the site. Never adds or removes. |
+| When someone visits, at most every 10 minutes | Sheet edits to live sites (Name, Title, Company, Location, Country, Availability, Image, Gallery) reach the site. Runs after the page has loaded, so visitors never wait. Never adds or removes. |
+| Every day, around 9am New York | The same sync, in case nobody visited. |
 | 1st of the month, around 10am New York | Full check: rows added in the sheet go live, deleted rows come off, every row gets a Status. |
 
 ---
@@ -175,7 +176,7 @@ go away. If anything fails, see Troubleshooting below.
 
 ### Step 8 · Add the launch sites
 
-`preload/` holds the nine launch sites (9 sites from 5 countries): xxxxxxx Each comes with practice, location, country and a Gallery of images of their work.
+`preload/` holds the launch sites. Each comes with title, location, country and a Gallery of images of their work.
 They're timed one minute apart, so Latest shows them in this order.
 
 1. Vercel → **Settings → Cron Jobs** → **Run** the `/api/check?mode=sync` job. This creates the
@@ -228,17 +229,19 @@ the header names as they are.
 |---|---|---|
 | Name | The person's or studio's name | Yes |
 | URL | Their site | Yes, as the link |
-| Title | What they do: Designer, Creative Director, Photographer… Pick from the dropdown or type anything | Yes. Until it's filled in, the card shows the address |
+| Title | What they do: Designer, Creative Director, Photographer… Pick from the dropdown or type anything | Yes. Left empty, nothing shows in its place |
 | Company | Where they work, if anywhere | Yes, in the + panel |
 | Location | Where they're based, as it should read: "Toronto and Copenhagen" | Yes, in the + panel |
 | Country | Feeds the country count. Several are fine: "Canada, Denmark". Keep spellings consistent ("United Kingdom", never sometimes "UK") | No |
 | Availability | "Available" shows an "Available for work" pill on their card. Blank or "Not available" shows nothing | Yes, as the pill |
-| Image | Optional: one image address to use as the cover | Yes, as the cover |
-| Gallery | Optional: up to 6 image addresses of their work, one per line. They replace the images found on the site. If Image is empty, the first one is the cover | Yes, in the card's slideshow |
+| Image | Optional, and usually left empty: one image address to put first, as the cover | Yes, as the cover |
+| Gallery | The card's images: up to 6 image addresses of their work, one per line. They replace the images found on the site; the first is the cover (unless Image is filled in) | Yes, in the card's slideshow |
 | Added | Filled in automatically. Only orders Latest | No |
 | Status, Last checked | Written by the app. Don't edit | No |
 
-- **Edit a live site** (any column from Name to Gallery) → on the site the next morning.
+- **Edit a live site** (any column from Name to Gallery) → on the site within about 10 minutes.
+- **Change a card's images:** paste the new image addresses in its Gallery cell. The old ones are
+  replaced and the new ones stored, within about 10 minutes.
 - **Members' own edits** with `/directory` are written to their row too, so the sheet always matches the site.
 - **Add a row** → goes live on the 1st of the month.
 - **Delete a row** → comes off on the 1st of the month.
@@ -313,6 +316,8 @@ admin does this once:
 
 ```
 index.html            the homepage: markup, styles and script in one file
+share-image.png       the preview shown when the site's link is shared (1200×630)
+apple-touch-icon.png  the icon when the site is added to an iPhone home screen
 favicon.svg           favicon
 fonts/                ABC Areal Medium (the .woff2 is what the site loads; the .ttf and Medium Italic are spares)
 vendor/gsap/          GSAP 3.13 + ScrollTrigger for the motion; the page works without them
@@ -342,11 +347,9 @@ curl -X POST "<your Vercel address>/api/import" \
 
 Tests need Node 20 or newer; run `npm install` first.
 
-- `npm test`: 76 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
+- `npm test`: 77 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
   images and the preload, with all outside services mocked.
-- `npm run test:browser`: 392 checks in Chromium across phones, tablet and desktop up to 2560,
+- `npm run test:browser`: 401 checks in Chromium across phones, tablet and desktop up to 2560,
   light and dark, reduced motion, GSAP missing, an empty index and the API being down.
   Screenshots go to `test/shots/`. It needs Playwright's Chromium (`npx playwright install chromium`)
   or `CHROMIUM_PATH`. Check on a real iPhone in Safari before launch.
-
- 

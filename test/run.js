@@ -175,6 +175,7 @@ await t('Slack activity keeps only the last 10', async () => {
 await t('Slack errors are explained in words the admin can act on', async () => {
   assert.match(explainSlackError(new Error('Slack conversations.history: not_in_channel')), /\/invite @GDG Library/);
   assert.match(explainSlackError(new Error('Slack auth.test: invalid_auth')), /SLACK_BOT_TOKEN is wrong/);
+  assert.match(explainSlackError(new Error('Slack conversations.history: not_allowed_token_type')), /xoxb-/);
 });
 
 await t('status page: ✓ / ✗ per piece with what to do, latest Slack activity, never a secret value', async () => {

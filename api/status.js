@@ -30,7 +30,7 @@ async function database() {
 }
 
 function images() {
-  return need(['BLOB_READ_WRITE_TOKEN'], 'Vercel → Storage → create a Blob store (Public) and connect it to this project, then redeploy.')
+  return need(['BLOB_READ_WRITE_TOKEN'], 'Vercel → Storage → open the Blob store → Projects → make sure this project is connected with Production ticked (or create a Public Blob store and connect it), then redeploy. Images already stored keep showing; new ones can’t be saved until then.')
     || { ok: true, text: 'Connected.' };
 }
 
@@ -53,6 +53,7 @@ async function googleSheet() {
 async function slackApp() {
   const m = need(['SLACK_BOT_TOKEN'], 'Slack app → Install App → copy the Bot User OAuth Token (xoxb-…) into Vercel, then redeploy.');
   if (m) return m;
+  if (!env('SLACK_BOT_TOKEN').startsWith('xoxb-')) return { ok: false, text: 'SLACK_BOT_TOKEN is the wrong kind of token: it should start with xoxb-.', fix: 'Slack app → OAuth & Permissions → copy the Bot User OAuth Token (xoxb-…) into SLACK_BOT_TOKEN in Vercel, then redeploy. Not the App-Level Token (xapp-…) or the Signing Secret.' };
   try {
     const a = await withTimeout(call('auth.test', {}));
     return { ok: true, text: `Connected to the ${a.team} workspace as ${a.user}.` };

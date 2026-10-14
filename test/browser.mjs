@@ -216,6 +216,23 @@ for (const [name, dev] of [['iPhone 15', VIEWPORTS['iPhone 15']], ['Laptop 1440'
     await p.mouse.move(m.x + m.width / 2, m.y - 60); await p.waitForTimeout(600);
     const back = await p.evaluate(() => [...document.querySelectorAll('.card:nth-child(2) img.slide')].findIndex((i) => i.classList.contains('on')));
     check(g, 'mouse: leaving a card returns to the cover', back === 0, `slide ${back}`);
+    // Mid-flip, an image is always fully showing, so the text card behind never flashes through.
+    await p.mouse.move(m.x + 5, m.y + m.height / 2);
+    const samples = await p.evaluate(async () => {
+      const media = document.querySelector('.card:nth-child(2) .media');
+      const box = media.getBoundingClientRect();
+      const out = [];
+      for (let k = 1; k <= 5; k++) {
+        media.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: box.left + (box.width * k) / 5.5, clientY: box.top + box.height / 2, pointerType: 'mouse' }));
+        for (let t = 0; t < 6; t++) {
+          await new Promise((r) => setTimeout(r, 40));
+          out.push(Math.max(0, ...[...media.querySelectorAll('img.slide.on')].map((i) => +getComputedStyle(i).opacity)));
+        }
+      }
+      return out;
+    });
+    check(g, 'mouse: no flash of the text card while flipping', samples.every((o) => o > 0.99), samples.map((o) => o.toFixed(2)).join(' '));
+    await p.mouse.move(m.x + m.width / 2, m.y - 60); await p.waitForTimeout(400);
   }
 
   // Views, sort, search, URL state
@@ -314,6 +331,13 @@ for (const [vp, dev] of [['Mobile 390', VIEWPORTS['iPhone 15']], ['Desktop 1440'
     await p.click('#info-open');
     await p.waitForTimeout(500);
     const copy = await p.textContent('#info .copy');
+    await p.click('#info-close').catch(() => {});
+    await p.evaluate(() => [...document.querySelectorAll('.card')].find((x) => /3am Studio/.test(x.textContent))?.scrollIntoView()); await p.waitForTimeout(800);
+    const emptyTitle = await p.evaluate(() => { const c = [...document.querySelectorAll('.card')].find((x) => /3am Studio/.test(x.textContent)); return c && [c.querySelector('.cap .p').textContent, c.querySelector('.fb .p')?.textContent ?? 'no text card']; });
+    check(g, 'an empty Title shows nothing (not the site address)', emptyTitle && emptyTitle.join('') === '', JSON.stringify(emptyTitle));
+    const behind = await p.evaluate(() => [...document.querySelectorAll('.card')].filter((c) => c.querySelector('img.slide') && c.querySelector('.fb')).length);
+    check(g, 'cards with images have no text card behind them', behind === 0, `${behind} cards`);
+    await p.click('#info-open'); await p.waitForTimeout(500);
     check(g, 'Info has the directory line and the rights line', /This directory highlights a selection of our members\./.test(copy) && /All rights to the work and imagery displayed on this website remain with their respective creators, clients, and copyright holders\./.test(copy));
     check(g, 'no errors in the console', errors.length === 0, errors.join(' | '));
     if (scheme === 'light') await p.screenshot({ path: path.join(SHOTS, `round2-info-${vp.replace(/\s+/g, '-').toLowerCase()}.png`) });
