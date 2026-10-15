@@ -24,6 +24,19 @@ export const slack = { posts: [], views: [], ephemerals: [], scopes: 'channels:h
 export const sheets = {}; // title -> { id, rows: [[...]] }  (row 0 = header)
 export const validations = []; // dropdowns set on the sheet
 export const sheetAccess = { readOnly: false }; // true: shared as Viewer, so every write is refused
+// The place lookup: a few cities, in the order the real one lists them (biggest first).
+const city = (name, latitude, longitude, country, timezone, admin1 = '') => ({ name, latitude, longitude, country, timezone, admin1 });
+const GEO = {
+  amsterdam: [city('Amsterdam', 52.374, 4.889, 'Netherlands', 'Europe/Amsterdam', 'North Holland'), city('Amsterdam', 42.938, -74.188, 'United States', 'America/New_York', 'New York')],
+  toronto: [city('Toronto', 43.651, -79.347, 'Canada', 'America/Toronto', 'Ontario')],
+  copenhagen: [city('Copenhagen', 55.676, 12.566, 'Denmark', 'Europe/Copenhagen')],
+  portland: [city('Portland', 45.523, -122.676, 'United States', 'America/Los_Angeles', 'Oregon'), city('Portland', 43.661, -70.255, 'United States', 'America/New_York', 'Maine')],
+  'central coast': [city('Central Coast', -33.42, 151.3, 'Australia', 'Australia/Sydney', 'New South Wales')],
+  london: [city('London', 51.509, -0.126, 'United Kingdom', 'Europe/London', 'England'), city('London', 42.984, -81.246, 'Canada', 'America/Toronto', 'Ontario')],
+  'sao paulo': [city('São Paulo', -23.548, -46.636, 'Brazil', 'America/Sao_Paulo')],
+  barcelona: [city('Barcelona', 41.389, 2.159, 'Spain', 'Europe/Madrid')],
+};
+export const geo = { down: false, asked: [] };
 let nextSheetId = 100;
 
 globalThis.fetch = async (url, opts = {}) => {
@@ -67,6 +80,12 @@ globalThis.fetch = async (url, opts = {}) => {
     if (method === 'chat.postMessage') { const ts = `${slack.nextTs++}.0`; slack.posts.push({ ...p, ts }); return Response.json({ ok: true, channel: p.channel, ts }); }
     if (method === 'reactions.get') return Response.json({ ok: true, message: { reactions: reactions[p.timestamp] || [] } });
     return Response.json({ ok: false, error: 'unknown_method' });
+  }
+  if (url.startsWith('https://geocoding-api.open-meteo.com/v1/search')) {
+    if (geo.down) return new Response('down', { status: 503 });
+    const name = new URL(url).searchParams.get('name').toLowerCase();
+    geo.asked.push(name);
+    return Response.json(GEO[name] ? { results: GEO[name] } : {});
   }
   if (url.includes('slow.example')) {
     return new Promise((_, rej) => opts.signal?.addEventListener('abort', () => rej(new Error('aborted'))));

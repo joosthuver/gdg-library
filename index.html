@@ -26,8 +26,9 @@
 <style>
 @font-face{font-family:"ABC Areal";src:url(/fonts/ABCAreal-Medium.woff2) format("woff2");font-weight:500;font-style:normal;font-display:block}
 
-/* Layout: logo, live count, Info and Apply; then the sites as a Grid (image cards) or an Index (list);
-   a floating pill dock (Light/Dark, Grid/Index, Latest/A–Z, search). Frosted panels: card details (+)
+/* Layout: logo, live count, Info and Apply; then the sites as a Grid (image cards), an Index (list) or a
+   Map (names where members are); a floating pill dock (Light/Dark, Grid/Index/Map, Latest/A–Z or the
+   map's region, search). Frosted panels: card details (+)
    and the info panel (Info pill). */
 :root{
   --ground:#ffffff;
@@ -103,6 +104,7 @@ button{cursor:pointer}
   touch-action:manipulation;white-space:nowrap;-webkit-tap-highlight-color:transparent;
 }
 .pill::before{content:'';position:absolute;inset:-2px 0}  /* 40px pill, 44px tap area */
+.pill[hidden]{display:none}
 .pill.strong,.pill.on{background:var(--pill-strong);color:var(--on-strong)}
 @media (hover:hover){
   .pill:hover{background:var(--pill-strong);color:var(--on-strong)}
@@ -213,6 +215,33 @@ a.row:focus-visible{outline-offset:-1px}
 
 .state{grid-column:1 / -1;color:var(--muted);padding:0.86em 0}
 
+/* ——— Map view: each name where its members are. No coastlines; the names draw the world. ——— */
+.mapwrap{margin-top:2.6rem}
+.map{position:relative;overflow:hidden;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;line-height:1.3}
+.map.grabbing{cursor:grabbing}
+.map .lat{position:absolute;left:0;right:0;top:0;height:1px;background:var(--rule);pointer-events:none}
+.map .lat span{position:absolute;left:0;bottom:0.3em;color:var(--muted)}
+.map .pt,.map .nm{position:absolute;left:0;top:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.map .pt{width:28px;height:28px;margin:-14px 0 0 -14px;display:flex;align-items:center;justify-content:center}
+.map .pt::after{content:'';width:6px;height:6px;border-radius:50%;background:var(--ink)}
+.map .nm{white-space:nowrap;padding:0 0.2em;background:var(--ground)}
+.map .nm .n{color:var(--muted)}
+.map .pt[hidden],.map .nm[hidden],.map .lat[hidden]{display:none}
+.map .nm.on,.map .nm.peek{z-index:2}
+@media (hover:hover){
+  .map:hover .nm{color:var(--muted)}
+  .map .nm:hover,.map .nm.on{color:var(--ink)}
+}
+.map-card{position:absolute;z-index:4;width:20em;max-width:calc(100% - 16px);overflow-y:auto;overscroll-behavior:contain;
+  border-radius:var(--radius);padding:0.86em 1em 1em;display:flex;flex-direction:column;gap:0.86em;cursor:auto;line-height:1.2}
+.map-card[hidden]{display:none}
+.map-card .head{padding-right:calc(var(--circle) + 0.6em)}
+.map-card .when,.map-card .note,.map-card .p,.map-card .av{color:var(--frost-muted)}
+.map-card .people{display:flex;flex-direction:column;gap:0.6em}
+.map-card a{display:flex;flex-direction:column}
+@media (hover:hover){ .map-card a:hover .nme{text-decoration:underline} }
+.map-card .x{top:0.55em;right:0.55em}
+
 /* ——— Dock ——— */
 .dock{
   position:fixed;z-index:21;
@@ -272,6 +301,7 @@ a.row:focus-visible{outline-offset:-1px}
   <button class="pill" id="theme" type="button">Light</button>
   <button class="pill strong" id="view" type="button">Grid</button>
   <button class="pill" id="sort" type="button">Latest</button>
+  <button class="pill" id="region" type="button" hidden>World</button>
   <label class="pill search"><span class="sr">Search the index</span><input id="q" type="search" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"></label>
 </nav>
 
@@ -293,6 +323,7 @@ a.row:focus-visible{outline-offset:-1px}
   const input = $('#q');
   const sortBtn = $('#sort');
   const viewBtn = $('#view');
+  const regionBtn = $('#region');
   const themeBtn = $('#theme');
   const statsEl = $('#stats');
   const peek = $('#peek');
@@ -354,7 +385,9 @@ a.row:focus-visible{outline-offset:-1px}
 
   // ——— State (mirrored in the URL so a view can be shared) ———
   const params = new URLSearchParams(location.search);
-  let view = params.get('view') === 'index' ? 'index' : 'grid';
+  const VIEWS = ['grid', 'index', 'map'];
+  const VIEW_NAME = { grid: 'Grid', index: 'Index', map: 'Map' };
+  let view = VIEWS.includes(params.get('view')) ? params.get('view') : 'grid';
   let sort = params.get('sort') === 'name' ? 'name' : 'latest';
   let query = params.get('q') || '';
   let sites = null;
@@ -363,7 +396,7 @@ a.row:focus-visible{outline-offset:-1px}
 
   function syncUrl() {
     const p = new URLSearchParams(location.search);
-    view === 'index' ? p.set('view', 'index') : p.delete('view');
+    view !== 'grid' ? p.set('view', view) : p.delete('view');
     sort === 'name' ? p.set('sort', 'name') : p.delete('sort');
     query ? p.set('q', query) : p.delete('q');
     const s = p.toString();
@@ -643,6 +676,321 @@ a.row:focus-visible{outline-offset:-1px}
     return a;
   }
 
+  // ——— Map: each city's name where its members are; no coastlines, the names draw the world ———
+  // Equal Earth projection, in map units: the world is MW wide, from 80°N to 56°S.
+  const RAD = Math.PI / 180;
+  const A1 = 1.340264, A2 = -0.081106, A3 = 0.000893, A4 = 0.003796, EM = Math.sqrt(3) / 2;
+  const ee = (lng, lat) => {
+    const t = Math.asin(EM * Math.sin(lat * RAD)), t2 = t * t, t6 = t2 * t2 * t2;
+    return [lng * RAD * Math.cos(t) / (EM * (A1 + 3 * A2 * t2 + t6 * (7 * A3 + 9 * A4 * t2))), t * (A1 + A2 * t2 + t6 * (A3 + A4 * t2))];
+  };
+  const MW = 1200, MK = MW / 2 / ee(180, 0)[0], MTOP = ee(0, 80)[1], MH = (MTOP - ee(0, -56)[1]) * MK;
+  const project = (lng, lat) => { const [x, y] = ee(lng, lat); return [MW / 2 + x * MK, (MTOP - y) * MK]; };
+  const LATS = [[60, '60°N'], [30, '30°N'], [0, '0°'], [-30, '30°S']].map(([lat, label]) => ({ y: project(0, lat)[1], label }));
+  const REGIONS = [
+    { name: 'World', box: null },
+    { name: 'Europe', box: [-11, 35, 31, 62] },     // west, south, east, north
+    { name: 'Americas', box: [-125, -40, -34, 52] },
+  ];
+  let region = 0;
+  const map = { el: null, card: null, places: [], lats: [], view: null, open: null, hover: null, anim: 0, w: 0, h: 0 };
+  const measure = document.createElement('canvas').getContext('2d');
+
+  // The places of the sites on show, one per city, biggest first.
+  function mapPlaces(rows) {
+    const byKey = new Map();
+    for (const s of rows) {
+      for (const p of s.places || []) {
+        const key = `${p.name}|${p.lat.toFixed(2)}|${p.lng.toFixed(2)}`;
+        if (!byKey.has(key)) byKey.set(key, { key, name: p.name, tz: p.tz, level: p.level, at: project(p.lng, p.lat), members: [] });
+        const g = byKey.get(key);
+        if (!g.members.includes(s)) g.members.push(s);
+      }
+    }
+    return [...byKey.values()].sort((a, b) => b.members.length - a.members.length || collator.compare(a.name, b.name));
+  }
+
+  const scale0 = () => Math.min(map.w / MW, map.h / MH); // k = 1: the whole world fits
+  function fitView(v) {
+    const k = Math.min(12, Math.max(1, v.k)), s = scale0() * k;
+    const hw = map.w / (2 * s), hh = map.h / (2 * s);
+    return { k, cx: MW / 2 > hw ? Math.min(MW - hw, Math.max(hw, v.cx)) : MW / 2, cy: MH / 2 > hh ? Math.min(MH - hh, Math.max(hh, v.cy)) : MH / 2 };
+  }
+  function regionView(r) {
+    if (!r.box) return fitView({ cx: MW / 2, cy: MH / 2, k: 1 });
+    const [w, s, e, n] = r.box, pts = [];
+    for (let i = 0; i <= 8; i++) { const lng = w + ((e - w) * i) / 8; pts.push(project(lng, s), project(lng, n)); }
+    for (let i = 0; i <= 8; i++) { const lat = s + ((n - s) * i) / 8; pts.push(project(w, lat), project(e, lat)); }
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const bw = Math.max(...xs) - Math.min(...xs), bh = Math.max(...ys) - Math.min(...ys);
+    const k = Math.min(map.w / bw, map.h / bh) / scale0();
+    return fitView({ cx: (Math.max(...xs) + Math.min(...xs)) / 2, cy: (Math.max(...ys) + Math.min(...ys)) / 2, k });
+  }
+  const toScreen = ([mx, my]) => {
+    const s = scale0() * map.view.k;
+    return [map.w / 2 + (mx - map.view.cx) * s, map.h / 2 + (my - map.view.cy) * s];
+  };
+
+  // The map fills the screen between the header and the dock.
+  function sizeMap() {
+    if (!map.el) return;
+    const top = map.el.getBoundingClientRect().top + scrollY;
+    const below = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+    map.el.style.height = `${Math.max(280, Math.round(innerHeight - top - below))}px`;
+    const r = map.el.getBoundingClientRect();
+    const changed = r.width !== map.w || r.height !== map.h;
+    map.w = r.width; map.h = r.height;
+    if (changed || !map.view) map.view = map.view ? fitView(map.view) : regionView(REGIONS[region]);
+  }
+
+  function labelWidth(text) {
+    const fs = parseFloat(getComputedStyle(map.el).fontSize) || 16;
+    measure.font = `500 ${fs}px "ABC Areal", "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    return measure.measureText(text).width * (1 - 0.022 * 0.6) + fs * 0.4 + 2;
+  }
+
+  // Positions everything for the current view. Names go where they fit, biggest groups first;
+  // the rest show as a dot until a closer zoom (or a hover) makes room. A bigger city's name may
+  // cover a smaller city's dot (zooming in separates them), but never another name or a latitude label.
+  function layoutMap() {
+    if (!map.el || !map.view) return;
+    const { w, h } = map;
+    const lineH = (parseFloat(getComputedStyle(map.el).fontSize) || 16) * 1.3;
+    const taken = []; // [left, top, right, bottom, how many members its dot stands for (names: all)]
+    for (const l of map.lats) {
+      const y = toScreen([0, l.y])[1];
+      l.el.hidden = y < lineH || y > h;
+      l.el.style.transform = `translateY(${y.toFixed(1)}px)`;
+      if (!l.el.hidden) taken.push([0, y - lineH - 2, (l.width || 40) + 6, y + 1, Infinity]);
+    }
+    const free = (b, n) => b[0] >= 0 && b[1] >= 0 && b[2] <= w && b[3] <= h
+      && !taken.some((t) => t[4] >= n && b[0] < t[2] && t[0] < b[2] && b[1] < t[3] && t[1] < b[3]);
+    for (const p of map.places) {
+      [p.x, p.y] = toScreen(p.at);
+      p.shown = p.x > -10 && p.y > -10 && p.x < w + 10 && p.y < h + 10;
+      p.pt.hidden = !p.shown;
+      p.nm.hidden = true; // placed below, if it fits
+      p.pt.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px)`;
+      if (p.shown) taken.push([p.x - 4, p.y - 4, p.x + 4, p.y + 4, p.members.length]);
+    }
+    const first = map.places.filter((p) => p.shown && (p === map.open || p === map.hover));
+    for (const p of [...first, ...map.places.filter((q) => q.shown && !first.includes(q))]) {
+      const g = 7, tw = p.width, th = lineH;
+      const tries = [[p.x + g, p.y - th / 2], [p.x - g - tw, p.y - th / 2], [p.x - tw / 2, p.y - g - th], [p.x - tw / 2, p.y + g]];
+      const spot = tries.find(([x, y]) => free([x, y, x + tw, y + th], p.members.length)) || (first.includes(p) ? tries[0] : null);
+      p.nm.hidden = !spot;
+      if (spot) { taken.push([spot[0], spot[1], spot[0] + tw, spot[1] + th, Infinity]); p.nm.style.transform = `translate(${spot[0].toFixed(1)}px, ${spot[1].toFixed(1)}px)`; }
+      p.nm.classList.toggle('on', p === map.open || p === map.hover);
+    }
+    placeCard();
+  }
+
+  // ——— The card for a city: who's there, and their local time ———
+  const zoneOf = (tz, now) => {
+    try {
+      const part = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(now).find((x) => x.type === 'timeZoneName');
+      const z = (part?.value || '').replace('GMT', 'UTC').replace('-', '−');
+      return z || 'UTC';
+    } catch { return ''; }
+  };
+  function fillCard(p) {
+    const c = map.card, now = new Date();
+    const head = el('div', 'head');
+    head.append(el('p', 'city', p.name));
+    if (p.tz) {
+      let t = '';
+      try { t = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', timeZone: p.tz }).format(now); } catch {}
+      if (t) head.append(el('p', 'when', `${zoneOf(p.tz, now)} ${t}`));
+    } else if (p.level === 'country') head.append(el('p', 'note', 'Somewhere in the country'));
+    const people = el('div', 'people');
+    for (const s of p.members) {
+      const a = el('a');
+      a.href = s.url; a.target = '_blank'; a.rel = 'noopener';
+      const name = el('span', 'nme', s.title || s.host);
+      const top = el('span');
+      top.append(name);
+      if (s.available) top.append(el('span', 'av', ' · Available'));
+      a.append(top);
+      if (s.practice) a.append(el('span', 'p', s.practice));
+      if (s.image) a.dataset.image = s.image;
+      people.append(a);
+    }
+    const x = el('button', 'x');
+    x.type = 'button'; x.setAttribute('aria-label', 'Close');
+    x.append(svg(CROSS));
+    x.addEventListener('click', (e) => { e.stopPropagation(); openPlace(null); });
+    c.replaceChildren(head, people, x);
+    c.setAttribute('aria-label', `${p.name}: ${p.members.length} ${p.members.length === 1 ? 'member' : 'members'}`);
+  }
+  function placeCard() {
+    const c = map.card, p = map.open;
+    if (!c) return;
+    if (!p || !p.shown) { c.hidden = true; return; }
+    c.hidden = false;
+    const narrow = map.w < 560;
+    c.style.maxHeight = `${Math.max(160, map.h - 16)}px`;
+    if (narrow) { c.style.left = '8px'; c.style.right = '8px'; c.style.top = ''; c.style.bottom = '8px'; c.style.width = 'auto'; return; }
+    c.style.right = ''; c.style.bottom = ''; c.style.width = '';
+    const cw = c.offsetWidth, ch = c.offsetHeight;
+    let left = p.x + 20;
+    if (left + cw > map.w - 8) left = p.x - 20 - cw;
+    left = Math.min(Math.max(8, left), Math.max(8, map.w - cw - 8));
+    const top = Math.min(Math.max(8, p.y - 28), Math.max(8, map.h - ch - 8));
+    c.style.left = `${left}px`; c.style.top = `${top}px`;
+  }
+  function openPlace(p) {
+    map.open = p;
+    if (p) fillCard(p);
+    peek.hidden = true;
+    layoutMap();
+    if (p && motion() && !map.card.hidden) G.fromTo(map.card, { opacity: 0, filter: 'blur(6px)' }, { opacity: 1, filter: 'blur(0px)', duration: 0.3, ease: EASE, clearProps: 'filter,opacity' });
+  }
+
+  // ——— Moving around: drag, scroll or pinch to zoom, double-click, and the region pill ———
+  function goTo(target, animate = motion()) {
+    cancelAnimationFrame(map.anim);
+    const from = map.view, to = fitView(target);
+    if (!animate || !from) { map.view = to; layoutMap(); return; }
+    const t0 = performance.now(), dur = 750;
+    const ease = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+    const step = (t) => {
+      const u = ease(Math.min(1, (t - t0) / dur));
+      map.view = fitView({ k: Math.exp(Math.log(from.k) + (Math.log(to.k) - Math.log(from.k)) * u), cx: from.cx + (to.cx - from.cx) * u, cy: from.cy + (to.cy - from.cy) * u });
+      layoutMap();
+      if (u < 1) map.anim = requestAnimationFrame(step);
+    };
+    map.anim = requestAnimationFrame(step);
+  }
+  function zoomAt(px, py, k) {
+    const v = map.view, s = scale0() * v.k, mx = v.cx + (px - map.w / 2) / s, my = v.cy + (py - map.h / 2) / s;
+    const k2 = Math.min(12, Math.max(1, k)), s2 = scale0() * k2;
+    map.view = fitView({ k: k2, cx: mx - (px - map.w / 2) / s2, cy: my - (py - map.h / 2) / s2 });
+    layoutMap();
+  }
+  function wireMap(m) {
+    const pointers = new Map();
+    let drag = null, pinch = null;
+    const local = (e) => { const r = m.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    const onCard = (e) => !!e.target.closest('.map-card');
+    m.addEventListener('wheel', (e) => {
+      if (onCard(e)) return;
+      e.preventDefault();
+      cancelAnimationFrame(map.anim);
+      const [x, y] = local(e);
+      zoomAt(x, y, map.view.k * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0016)));
+    }, { passive: false });
+    m.addEventListener('dblclick', (e) => { if (onCard(e) || e.target.closest('.pt, .nm')) return; const [x, y] = local(e); zoomAt(x, y, map.view.k * 2); });
+    m.addEventListener('pointerdown', (e) => {
+      if (onCard(e) || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      cancelAnimationFrame(map.anim);
+      pointers.set(e.pointerId, local(e));
+      if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, k: map.view.k }; }
+      drag = { x: e.clientX, y: e.clientY, cx: map.view.cx, cy: map.view.cy, moved: drag?.moved && pointers.size > 1 };
+    });
+    m.addEventListener('pointermove', (e) => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, local(e));
+      if (pointers.size === 2 && pinch) {
+        const [a, b] = [...pointers.values()];
+        drag.moved = true;
+        zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, pinch.k * (Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d));
+        return;
+      }
+      if (!drag) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+      if (!drag.moved) { drag.moved = true; try { m.setPointerCapture(e.pointerId); } catch {} m.classList.add('grabbing'); }
+      const s = scale0() * map.view.k;
+      map.view = fitView({ k: map.view.k, cx: drag.cx - dx / s, cy: drag.cy - dy / s });
+      layoutMap();
+    });
+    const end = (e) => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (!pointers.size) {
+        m.classList.remove('grabbing');
+        const moved = drag?.moved;
+        drag = null;
+        if (moved) { suppressClick = true; setTimeout(() => { suppressClick = false; }, 0); }
+      }
+    };
+    let suppressClick = false;
+    m.addEventListener('pointerup', end);
+    m.addEventListener('pointercancel', end);
+    m.addEventListener('click', (e) => {
+      if (suppressClick || onCard(e)) return;
+      const hit = e.target.closest('.pt, .nm');
+      const p = hit && map.places.find((q) => q.pt === hit || q.nm === hit);
+      openPlace(p && p !== map.open ? p : null);
+    });
+    m.addEventListener('pointerover', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const hit = e.target.closest('.pt, .nm');
+      const p = hit ? map.places.find((q) => q.pt === hit || q.nm === hit) : null;
+      if (p !== map.hover) { map.hover = p; layoutMap(); }
+    });
+    m.addEventListener('pointerleave', () => { if (map.hover) { map.hover = null; layoutMap(); } });
+  }
+
+  function renderMap(rows, frag) {
+    const box = el('div', 'map');
+    box.setAttribute('role', 'region');
+    box.setAttribute('aria-label', 'Map of where members are. Drag to move, scroll or pinch to zoom.');
+    map.lats = LATS.map((l) => {
+      const line = el('div', 'lat');
+      line.setAttribute('aria-hidden', 'true');
+      line.append(el('span', '', l.label));
+      box.append(line);
+      return { ...l, el: line };
+    });
+    const openKey = map.open?.key;
+    map.places = mapPlaces(rows);
+    // Smallest first, so where dots crowd (Amsterdam and Rotterdam) the bigger city's is on top to tap.
+    for (const p of [...map.places].reverse()) {
+      const n = p.members.length;
+      p.pt = el('button', 'pt');
+      p.pt.type = 'button';
+      p.pt.setAttribute('aria-label', `${p.name}, ${n} ${n === 1 ? 'member' : 'members'}`);
+      p.nm = el('button', 'nm', p.name);
+      p.nm.type = 'button'; p.nm.tabIndex = -1; p.nm.setAttribute('aria-hidden', 'true');
+      if (n > 1) p.nm.append(el('span', 'n', ` ${n}`));
+      box.append(p.pt, p.nm);
+    }
+    map.card = el('section', 'map-card frost');
+    map.card.setAttribute('role', 'dialog');
+    map.card.hidden = true;
+    box.append(map.card);
+    map.el = box;
+    map.open = map.places.find((p) => p.key === openKey) || null;
+    map.hover = null;
+    wireMap(box);
+    const wrap = el('div', 'mapwrap');
+    wrap.append(box);
+    frag.append(wrap);
+  }
+  // Searching moves the map to what was found (not too close for a single city).
+  function fitPlaces(places) {
+    const xs = places.map((p) => p.at[0]), ys = places.map((p) => p.at[1]);
+    const bw = Math.max(...xs) - Math.min(...xs) + 160, bh = Math.max(...ys) - Math.min(...ys) + 80;
+    return fitView({ cx: (Math.max(...xs) + Math.min(...xs)) / 2, cy: (Math.max(...ys) + Math.min(...ys)) / 2, k: Math.min(4, Math.min(map.w / bw, map.h / bh) / scale0()) });
+  }
+  // Once the map is on the page: size it, measure the names, lay it out.
+  function mountMap() {
+    if (!map.el?.isConnected) return;
+    sizeMap();
+    const q = query.trim().toLowerCase();
+    if (q && q !== map.fitFor && map.places.length) { cancelAnimationFrame(map.anim); map.view = fitPlaces(map.places); }
+    else if (!q && map.fitFor) { cancelAnimationFrame(map.anim); map.view = regionView(REGIONS[region]); } // search cleared: back to the region
+    map.fitFor = q;
+    for (const p of map.places) p.width = labelWidth(p.nm.textContent);
+    for (const l of map.lats) l.width = labelWidth(l.label);
+    if (map.open) fillCard(map.open);
+    layoutMap();
+  }
+  addEventListener('resize', () => { if (view === 'map' && map.el?.isConnected) { sizeMap(); layoutMap(); } });
+  document.fonts?.ready?.then(() => { if (view === 'map') mountMap(); });
+
   // ——— Render ———
   function visibleSites() {
     const q = query.trim().toLowerCase();
@@ -653,12 +1001,18 @@ a.row:focus-visible{outline-offset:-1px}
     return rows;
   }
 
+  const nextView = () => VIEWS[(VIEWS.indexOf(view) + 1) % VIEWS.length];
   function render() {
-    setLabel(viewBtn, view === 'index' ? 'Index' : 'Grid', view === 'index' ? 'Index view. Switch to grid' : 'Grid view. Switch to index');
+    setLabel(viewBtn, VIEW_NAME[view], `${VIEW_NAME[view]} view. Switch to ${VIEW_NAME[nextView()].toLowerCase()}`);
     setLabel(sortBtn, sort === 'name' ? 'A–Z' : 'Latest', sort === 'name' ? 'Sorted A to Z. Sort by latest' : 'Sorted by latest. Sort A to Z');
-    list.className = view === 'index' ? 'rows' : 'cards';
+    const next = REGIONS[(region + 1) % REGIONS.length].name;
+    setLabel(regionBtn, REGIONS[region].name, `Showing ${REGIONS[region].name}. Show ${next}`);
+    sortBtn.hidden = view === 'map';
+    regionBtn.hidden = view !== 'map';
+    list.className = view === 'index' ? 'rows' : view === 'map' ? '' : 'cards';
     peek.hidden = true;
     openCard = null;
+    if (view !== 'map') { cancelAnimationFrame(map.anim); map.el = null; }
     if (!sites) return;
 
     // Stop the old cards' timers and scroll animations.
@@ -668,6 +1022,14 @@ a.row:focus-visible{outline-offset:-1px}
 
     const rows = visibleSites();
     const frag = document.createDocumentFragment();
+    if (view === 'map') {
+      if (!sites.length) frag.append(el('p', 'state', 'Nothing here yet.'));
+      else if (!rows.length) frag.append(el('p', 'state', `No sites match “${query.trim()}”.`));
+      else renderMap(rows, frag);
+      list.replaceChildren(frag);
+      mountMap();
+      return;
+    }
     if (view === 'index' && rows.length) {
       const labels = el('div', 'row grid12 labels');
       labels.setAttribute('aria-hidden', 'true');
@@ -708,8 +1070,8 @@ a.row:focus-visible{outline-offset:-1px}
   // ——— Index hover preview ———
   let peekFor = null;
   list.addEventListener('pointermove', (e) => {
-    if (view !== 'index' || !finePointer.matches) return;
-    const r = e.target.closest('a.row');
+    if (view === 'grid' || !finePointer.matches) return;
+    const r = e.target.closest('a.row, .map-card a');
     if (!r || !r.dataset.image) { peek.hidden = true; peekFor = null; return; }
     if (peekFor !== r) {
       peekFor = r;
@@ -767,7 +1129,13 @@ a.row:focus-visible{outline-offset:-1px}
 
   // ——— Controls ———
   const closeInfoFirst = () => { if (!info.hidden) closeInfo(); };
-  viewBtn.addEventListener('click', () => { closeInfoFirst(); view = view === 'index' ? 'grid' : 'index'; syncUrl(); rerender(); });
+  viewBtn.addEventListener('click', () => { closeInfoFirst(); view = nextView(); syncUrl(); rerender(); });
+  regionBtn.addEventListener('click', () => {
+    closeInfoFirst();
+    region = (region + 1) % REGIONS.length;
+    setLabel(regionBtn, REGIONS[region].name, `Showing ${REGIONS[region].name}. Show ${REGIONS[(region + 1) % REGIONS.length].name}`);
+    if (map.el) { map.open = null; goTo(regionView(REGIONS[region])); }
+  });
   sortBtn.addEventListener('click', () => { closeInfoFirst(); sort = sort === 'name' ? 'latest' : 'name'; syncUrl(); rerender(); });
   input.addEventListener('focus', closeInfoFirst);
   input.addEventListener('input', () => { query = input.value; syncUrl(); render(); });
@@ -776,13 +1144,14 @@ a.row:focus-visible{outline-offset:-1px}
     if (e.key === 'Escape') {
       if (!info.hidden) return closeInfo();
       if (openCard) return closePanel(openCard);
+      if (view === 'map' && map.open) return openPlace(null);
       if (document.activeElement === input) { input.value = ''; query = ''; syncUrl(); render(); input.blur(); }
     } else if (e.key === '/' && document.activeElement !== input) { e.preventDefault(); input.focus(); }
   });
 
   // ——— Data ———
   const clean = (arr) => arr.filter((s) => s && /^https?:\/\//i.test(s.url));
-  const signature = (arr) => arr.map((s) => `${s.url}|${s.title}|${s.practice}|${s.company}|${s.location}|${s.country}|${s.available}|${s.image}`).join('\n');
+  const signature = (arr) => arr.map((s) => `${s.url}|${s.title}|${s.practice}|${s.company}|${s.location}|${s.country}|${s.available}|${s.image}|${JSON.stringify(s.places || [])}`).join('\n');
   // Country can hold several ("Canada, Denmark"); each counts once. Matches lib/countries.js.
   const countryList = (v) => String(v || '').split(/\s*(?:,|;|\/|&|\band\b|\+)\s*/i).map((x) => x.trim().toLowerCase()).filter(Boolean);
   const countCountries = (arr) => new Set(arr.flatMap((s) => countryList(s.country))).size;

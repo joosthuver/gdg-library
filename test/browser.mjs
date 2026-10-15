@@ -31,6 +31,16 @@ const COUNTRIES = ['United States', 'United Kingdom', 'France', 'Japan', 'Chile'
 const LOCATIONS = ['San Francisco', 'Crail', 'Paris', 'Tokyo', 'Santiago', 'Valparaíso', 'Berlin', 'Oslo', 'Toronto and Copenhagen', 'Stockholm'];
 const NAMES = ['Ondine', 'Halvard', 'Brume', 'Lindqvist', 'North Pole', 'Low Tide', 'Salt & Signal', 'Ota', 'Open Form', 'Reyes', 'Concrete', 'Field Notes', 'Paper Weight', 'Kiosk', 'Atlas', 'Signal', 'Common Ground', 'Marrow', 'Vessel', 'Quiet Hours'];
 const day = 864e5;
+// Where each location is, as the site's place lookup returns it.
+const city = (name, lat, lng, tz) => ({ name, lat, lng, tz, level: 'city' });
+const PLACES = {
+  'San Francisco': [city('San Francisco', 37.775, -122.419, 'America/Los_Angeles')], Crail: [city('Crail', 56.26, -2.629, 'Europe/London')],
+  Paris: [city('Paris', 48.853, 2.349, 'Europe/Paris')], Tokyo: [city('Tokyo', 35.69, 139.692, 'Asia/Tokyo')],
+  Santiago: [city('Santiago', -33.457, -70.648, 'America/Santiago')], 'Valparaíso': [city('Valparaíso', -33.039, -71.628, 'America/Santiago')],
+  Berlin: [city('Berlin', 52.524, 13.411, 'Europe/Berlin')], Oslo: [city('Oslo', 59.913, 10.739, 'Europe/Oslo')],
+  'Toronto and Copenhagen': [city('Toronto', 43.701, -79.416, 'America/Toronto'), city('Copenhagen', 55.676, 12.566, 'Europe/Copenhagen')],
+  Stockholm: [city('Stockholm', 59.333, 18.065, 'Europe/Stockholm')],
+};
 const sites = Array.from({ length: 40 }, (_, i) => {
   const host = `${NAMES[i % NAMES.length].toLowerCase().replace(/[^a-z]+/g, '')}${i}.example`;
   const img = i % 10;
@@ -38,6 +48,7 @@ const sites = Array.from({ length: 40 }, (_, i) => {
     title: `${NAMES[i % NAMES.length]} ${i < 20 ? 'Studio' : 'Works'}`,
     url: `https://${host}/`, host,
     practice: PRACTICES[i % PRACTICES.length], location: LOCATIONS[i % LOCATIONS.length], country: COUNTRIES[i % COUNTRIES.length],
+    places: PLACES[LOCATIONS[i % LOCATIONS.length]],
     company: i % 2 ? `${NAMES[(i + 3) % NAMES.length]} & Co` : '', available: i % 4 === 0,
     added: new Date(Date.UTC(2026, 9, 8) - i * day).toISOString(),
     image: `/test/fixtures/images/${String(img).padStart(2, '0')}.jpg`,
@@ -46,8 +57,8 @@ const sites = Array.from({ length: 40 }, (_, i) => {
 });
 // Edge cases
 sites.push(
-  { title: 'The Extraordinarily Long Name Studio for Experimental Typography and Moving Image Research', url: 'https://long.example/', host: 'an-unusually-long-hostname-for-a-portfolio.example', practice: 'Creative Technologist, Art Director', country: 'United Kingdom', added: '2020-01-01T00:00:00Z', image: '/test/fixtures/images/03.jpg', gallery: [] },
-  { title: 'Ólafur Ærøe', url: 'https://olafur.example/', host: 'olafur.example', practice: 'Photographer', location: 'Reykjavík', country: 'Iceland', added: '2019-05-01T00:00:00Z', image: '', gallery: [] },
+  { title: 'The Extraordinarily Long Name Studio for Experimental Typography and Moving Image Research', url: 'https://long.example/', host: 'an-unusually-long-hostname-for-a-portfolio.example', practice: 'Creative Technologist, Art Director', country: 'United Kingdom', places: [{ name: 'United Kingdom', lat: 53.83, lng: -2.41, tz: '', level: 'country' }], added: '2020-01-01T00:00:00Z', image: '/test/fixtures/images/03.jpg', gallery: [] },
+  { title: 'Ólafur Ærøe', url: 'https://olafur.example/', host: 'olafur.example', practice: 'Photographer', location: 'Reykjavík', country: 'Iceland', places: [city('Reykjavík', 64.135, -21.895, 'Atlantic/Reykjavik')], added: '2019-05-01T00:00:00Z', image: '', gallery: [] },
   { title: '3am Studio', url: 'https://3am.example/', host: '3am.example', practice: '', country: '', added: '2019-04-01T00:00:00Z', image: '/missing.jpg', gallery: [] },
 );
 const COUNTRY_COUNT = new Set(sites.flatMap((s) => s.country.split(/\s*(?:,|\band\b)\s*/).map((c) => c.trim().toLowerCase())).filter(Boolean)).size;
@@ -136,7 +147,7 @@ for (const [name, dev] of Object.entries(VIEWPORTS)) {
         stats: document.querySelector('#stats').textContent,
         clock: document.querySelector('#clock').textContent,
         eager: [...document.querySelectorAll('img.slide')].filter((i) => i.loading === 'eager').length,
-        pills: [...new Set([...document.querySelectorAll('.dock .pill, .tools .pill')].map((e) => Math.round(e.getBoundingClientRect().height)))],
+        pills: [...new Set([...document.querySelectorAll('.dock .pill:not([hidden]), .tools .pill')].map((e) => Math.round(e.getBoundingClientRect().height)))],
         circle: (() => { const m = document.querySelector('.card .more'); if (!m) return null; const b = m.getBoundingClientRect(), i = m.querySelector('svg').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height), Math.round(i.width), Math.round(i.height)].join('x'); })(),
       };
     });
@@ -281,8 +292,8 @@ for (const [name, dev] of [['iPhone 15', VIEWPORTS['iPhone 15']], ['Laptop 1440'
   check(g, 'theme choice survives a reload', (await p.evaluate(() => document.documentElement.dataset.theme)) === 'dark');
 
   // Fallback card + broken image
-  await p.evaluate(() => { document.querySelector('#view').textContent === 'Index' && document.querySelector('#view').click(); });
-  await p.waitForTimeout(900);
+  for (let i = 0; i < 3 && (await p.textContent('#view')) !== 'Grid'; i++) { await p.click('#view'); await p.waitForTimeout(700); }
+  await p.waitForTimeout(300);
   check(g, 'site with no image shows the text card', await p.evaluate(() => [...document.querySelectorAll('.card')].some((c) => /Ólafur/.test(c.textContent) && !c.querySelector('img.slide'))));
   await p.evaluate(() => [...document.querySelectorAll('.card')].find((c) => /3am Studio/.test(c.textContent)).scrollIntoView());
   await p.waitForTimeout(1200);
@@ -336,7 +347,7 @@ for (const [vp, dev] of [['Mobile 390', VIEWPORTS['iPhone 15']], ['Desktop 1440'
     const idx = await p.evaluate(() => ({ labels: [...document.querySelectorAll('.row.labels span')].map((x) => x.textContent), marks: document.querySelectorAll('.row .avail-i').length }));
     check(g, 'Index marks available members', idx.marks === 10);
     if (vp.startsWith('Desktop')) check(g, 'Index headers read Name / Title / Location / Address', idx.labels.join('/') === 'Name/Title/Location/Address', idx.labels.join('/'));
-    await p.click('#view');
+    await p.click('#view'); await p.click('#view'); // Index → Map → Grid
     await p.click('#info-open');
     await p.waitForTimeout(500);
     const copy = await p.textContent('#info .copy');
@@ -353,6 +364,87 @@ for (const [vp, dev] of [['Mobile 390', VIEWPORTS['iPhone 15']], ['Desktop 1440'
     await p.click('#info-close');
     await p.waitForTimeout(500);
     await p.screenshot({ path: path.join(SHOTS, `round2-${vp.replace(/\s+/g, '-').toLowerCase()}-${scheme}.png`) });
+    await ctx.close();
+  }
+}
+
+// ——— Map view: names where members are ———
+for (const [vp, dev] of [['Mobile 390', VIEWPORTS['iPhone 15']], ['Desktop 1440', VIEWPORTS['Laptop 1440']]]) {
+  for (const scheme of ['light', 'dark']) {
+    const g = `Map · ${vp} · ${scheme}`;
+    const touch = !!dev.hasTouch;
+    const press = (sel) => (touch ? p.tap(sel) : p.click(sel));
+    const { ctx, p, errors } = await open(dev, '?view=map', { scheme });
+    await p.waitForTimeout(400);
+    const state = () => p.evaluate(() => {
+      const box = document.querySelector('.map'), b = box.getBoundingClientRect();
+      const names = [...box.querySelectorAll('.nm:not([hidden])')].map((n) => { const r = n.getBoundingClientRect(); return { text: n.textContent, l: r.left, t: r.top, r: r.right, b: r.bottom }; });
+      const dot = (name) => { const d = box.querySelector(`.pt[aria-label^="${name},"]`); if (!d) return null; const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+      const card = box.querySelector('.map-card'), cr = card.getBoundingClientRect();
+      return {
+        box: { l: b.left, t: b.top, r: b.right, b: b.bottom }, names, all: box.querySelectorAll('.pt').length,
+        shown: box.querySelectorAll('.pt:not([hidden])').length, paris: dot('Paris'), tokyo: dot('Tokyo'),
+        dockTop: document.querySelector('.dock').getBoundingClientRect().top, scrollW: document.documentElement.scrollWidth, vw: innerWidth,
+        view: document.querySelector('#view').textContent, sortHidden: document.querySelector('#sort').hidden,
+        region: document.querySelector('#region').textContent, regionHidden: document.querySelector('#region').hidden,
+        card: card.hidden ? null : { l: cr.left, t: cr.top, r: cr.right, b: cr.bottom, links: card.querySelectorAll('a').length, when: card.querySelector('.when')?.textContent || '', text: card.textContent },
+      };
+    });
+    const clean = (n, box) => n.every((a, i) => a.l >= box.l - 0.5 && a.r <= box.r + 0.5 && a.t >= box.t - 0.5 && a.b <= box.b + 0.5
+      && n.every((c, j) => i >= j || !(a.l < c.r - 0.5 && c.l < a.r - 0.5 && a.t < c.b - 0.5 && c.t < a.b - 0.5)));
+    let s = await state();
+    check(g, 'opens from ?view=map: the Map pill, and the region pill in place of Latest', s.view === 'Map' && s.sortHidden && !s.regionHidden && s.region === 'World', JSON.stringify([s.view, s.sortHidden, s.region]));
+    check(g, 'one dot per place, all on screen at World (cities and a country-only member)', s.all === 13 && s.shown === 13, `${s.shown}/${s.all}`);
+    check(g, 'city names never overlap and stay inside the map', s.names.length >= 3 && clean(s.names, s.box), `${s.names.length} names`);
+    check(g, 'the map fills the space above the dock', s.box.b <= s.dockTop - 4 && s.dockTop - s.box.b < 140, `${Math.round(s.box.b)} / dock ${Math.round(s.dockTop)}`);
+    check(g, 'no sideways scroll', s.scrollW <= s.vw);
+    const worldNames = s.names.length;
+
+    await press('#region'); await p.waitForTimeout(1100);
+    s = await state();
+    const eu = s.names.map((n) => n.text.replace(/\s\d+$/, '')).filter((n) => ['Paris', 'Berlin', 'Oslo', 'Stockholm', 'Copenhagen', 'Crail'].includes(n));
+    check(g, 'region pill: Europe zooms in and more names fit', s.region === 'Europe' && eu.length >= 4 && s.names.length >= Math.min(worldNames, 4) && clean(s.names, s.box), `${eu.join(', ')}`);
+
+    await press('.pt[aria-label^="Paris,"]'); await p.waitForTimeout(500);
+    s = await state();
+    check(g, 'tapping a city opens its card: every member there, linked, with local time', !!s.card && s.card.links === 4 && /^UTC[+−]\d/.test(s.card.when), JSON.stringify(s.card && [s.card.links, s.card.when]));
+    check(g, 'the card stays inside the map', !!s.card && s.card.l >= s.box.l - 0.5 && s.card.r <= s.box.r + 0.5 && s.card.t >= s.box.t - 0.5 && s.card.b <= s.box.b + 0.5);
+    if (touch) await p.tap('.map-card .x'); else await p.keyboard.press('Escape');
+    await p.waitForTimeout(200);
+    check(g, touch ? '× closes the card' : 'Escape closes the card', !(await state()).card);
+
+    await p.fill('#q', 'tokyo'); await p.waitForTimeout(250);
+    s = await state();
+    check(g, 'search narrows the map to who matches', s.all === 1 && s.names.length === 1 && s.names[0].text === 'Tokyo 4', s.names.map((n) => n.text).join(','));
+    await p.fill('#q', ''); await p.waitForTimeout(250);
+    s = await state();
+    check(g, 'clearing the search goes back to the region on the pill', s.all === 13 && s.region === 'Europe' && s.names.some((n) => /^Paris/.test(n.text)));
+
+    if (!touch) {
+      await press('#region'); await press('#region'); await p.waitForTimeout(1100); // Americas → World
+      s = await state();
+      await p.mouse.move(s.paris[0], s.paris[1]);
+      await p.mouse.wheel(0, -500); await p.waitForTimeout(150);
+      const zoomed = (await state());
+      check(g, 'scrolling zooms in where the pointer is', Math.hypot(zoomed.paris[0] - s.paris[0], zoomed.paris[1] - s.paris[1]) < 3
+        && (!zoomed.tokyo || Math.hypot(zoomed.tokyo[0] - s.tokyo[0], zoomed.tokyo[1] - s.tokyo[1]) > 40));
+      const [x, y] = [zoomed.paris[0] + 40, zoomed.paris[1] + 60];
+      await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + 120, y + 40, { steps: 6 }); await p.mouse.up(); await p.waitForTimeout(100);
+      const dragged = await state();
+      check(g, 'dragging moves the map', Math.abs(dragged.paris[0] - zoomed.paris[0] - 120) < 3 || Math.abs(dragged.paris[1] - zoomed.paris[1] - 40) < 3, `${(dragged.paris[0] - zoomed.paris[0]).toFixed(1)}, ${(dragged.paris[1] - zoomed.paris[1]).toFixed(1)}`);
+      check(g, 'a drag doesn’t open a card', !dragged.card);
+      const orphans = await p.evaluate(() => [...document.querySelectorAll('.map .nm:not([hidden])')].filter((n) => {
+        const label = n.firstChild.textContent;
+        return document.querySelector(`.map .pt[aria-label^="${label},"]`)?.hidden !== false;
+      }).map((n) => n.textContent));
+      check(g, 'every name on screen has its dot on screen', orphans.length === 0, orphans.join(', '));
+    }
+    await p.screenshot({ path: path.join(SHOTS, `map-${vp.replace(/\s+/g, '-').toLowerCase()}-${scheme}.png`) });
+
+    await press('#view'); await p.waitForTimeout(900);
+    s = await p.evaluate(() => ({ view: document.querySelector('#view').textContent, sort: !document.querySelector('#sort').hidden, region: document.querySelector('#region').hidden, cards: document.querySelectorAll('.card').length }));
+    check(g, 'the view pill goes on to Grid, with Latest back', s.view === 'Grid' && s.sort && s.region && s.cards > 0);
+    check(g, 'no errors in the console', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
 }

@@ -39,8 +39,13 @@ Once a month the site is checked against the sheet. The sheet wins.
 - **On the page:**
   - **Header:** the logo, live counts of sites and countries, the visitor's time with its UTC
     offset, Info and Apply.
-  - **Dock:** Light/Dark, Grid/Index, A–Z/Latest, and search (which also matches company,
+  - **Dock:** Light/Dark, Grid/Index/Map, A–Z/Latest, and search (which also matches company,
     and "available").
+  - **Map:** each city's name where its members are, with how many; no coastlines, the names draw
+    the world. Drag to move, scroll or pinch to zoom. In Map view, the A–Z/Latest pill becomes the
+    region: World, Europe, Americas. Tap a city for who's there (with their titles, availability and
+    local time) and links to their sites; search narrows the map and moves it to what it finds.
+    Names that don't fit show as a dot until you zoom in.
 
 ### What runs where
 
@@ -53,12 +58,14 @@ Once a month the site is checked against the sheet. The sheet wins.
 | Approvals | Slack app "GDG Library" | works on Slack's free plan |
 | Admin sheet | Google Sheets, through a service account | free |
 | Finding images on sites built in JavaScript | Microlink | free up to 50 a day; an optional key removes the limit |
+| Finding cities for the map | Open-Meteo place lookup | free, no key; each Location is looked up once |
 
 ### Schedule
 
 | When | What happens |
 |---|---|
 | When someone visits, at most every 10 minutes | Sheet edits to live sites (Name, Title, Company, Location, Country, Availability, Image, Gallery) reach the site. Runs after the page has loaded, so visitors never wait. Never adds or removes. |
+| When someone visits, at most every minute | Members whose Location or Country is new or changed are put on the map, a few at a time. |
 | Every day, around 9am New York | The same sync, in case nobody visited. |
 | 1st of the month, around 10am New York | Full check: rows added in the sheet go live, deleted rows come off, every row gets a Status. |
 
@@ -233,7 +240,7 @@ the header names as they are.
 | Title | What they do: Designer, Creative Director, Photographer… Pick from the dropdown or type anything | Yes. Left empty, nothing shows in its place |
 | Company | Where they work, if anywhere | Yes, in the + panel |
 | Location | Where they're based, as it should read: "Toronto and Copenhagen" | Yes, in the + panel |
-| Country | Feeds the country count. Several are fine: "Canada, Denmark". Keep spellings consistent ("United Kingdom", never sometimes "UK") | No |
+| Country | Feeds the country count, and places them on the map. Several are fine: "Canada, Denmark". "UK" and "United Kingdom" (or "USA" and "United States") count as one | No |
 | Availability | "Available" shows an "Available for work" pill on their card. Blank or "Not available" shows nothing | Yes, as the pill |
 | Image | Optional, and usually left empty: one image address to put first, as the cover | Yes, as the cover |
 | Gallery | The card's images: up to 6 image addresses of their work, one per line. They replace the images found on the site; the first is the cover (unless Image is filled in) | Yes, in the card's slideshow |
@@ -241,6 +248,10 @@ the header names as they are.
 | Status, Last checked | Written by the app. Don't edit | No |
 
 - **Edit a live site** (any column from Name to Gallery) → on the site within about 10 minutes.
+- **The map** reads Location: a city ("Amsterdam"), several ("Toronto and Copenhagen"), or a
+  country on its own ("USA", shown in the middle of the country). Add the region when a city name
+  is common ("Portland, Maine"). If a city can't be found, the member shows in the middle of their
+  Country; the status page lists who that happened to, and anyone left off the map.
 - **Change a card's images:** paste the new image addresses in its Gallery cell. The old ones are
   replaced and the new ones stored, within about 10 minutes.
 - **Members' own edits** with `/directory` are written to their row too, so the sheet always matches the site.
@@ -288,7 +299,7 @@ Any change committed to GitHub redeploys the site within a minute.
 ### Troubleshooting
 
 **Start with the status page:** your site's address followed by `/api/status`, e.g. `gdg-library.vercel.app/api/status`.
-It shows a ✓ or ✗ for each piece (database, image storage, sheet, Slack, approvers, the /directory form and welcome button, schedule),
+It shows a ✓ or ✗ for each piece (database, image storage, sheet, Slack, approvers, the /directory form and welcome button, map, schedule),
 says what to do about each ✗, and lists the last few ✅ and forms from Slack and what happened to each. It never
 shows the settings' values.
 For anything it doesn't explain, Vercel → project → **Logs** has the full errors.
@@ -331,14 +342,15 @@ favicon.svg           favicon
 fonts/                ABC Areal Medium (the .woff2 is what the site loads; the .ttf and Medium Italic are spares)
 vendor/gsap/          GSAP 3.13 + ScrollTrigger for the motion; the page works without them
 api/slack.js          Slack events: ✅ added / removed
-api/sites.js          public list for the homepage, cached 30 s
+api/sites.js          public list for the homepage (with each member's places), cached 30 s
 api/cover.js          a card's cover    } a card's images are captured together on
 api/gallery.js        a card's gallery  } first view and stored in Blob
 api/check.js          monthly check and daily sync (Vercel Cron)
 api/import.js         bulk add / remove (Authorization: Bearer ADMIN_TOKEN)
 api/status.js         the setup check page: each piece ✓ / ✗ and recent Slack activity
 lib/directory.js      the /directory form and its button: welcome new members, open, check, post for ✅ or save the owner's changes
-lib/                  Slack, Redis, Sheets, card images, page metadata, country count
+lib/places.js         where members are on the map: cities looked up once, countries from lib/country-centers.js
+lib/                  Slack, Redis, Sheets, card images, page metadata, country names and count
 preload/              the launch sites, as CSV (for the sheet) and JSON (for /api/import)
 slack-manifest.json   the Slack app definition
 vercel.json           cron schedule, function timeouts, image settings, font caching
@@ -356,9 +368,9 @@ curl -X POST "<your Vercel address>/api/import" \
 
 Tests need Node 20 or newer; run `npm install` first.
 
-- `npm test`: 90 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
-  images and the preload, with all outside services mocked.
-- `npm run test:browser`: 402 checks in Chromium across phones, tablet and desktop up to 2560,
+- `npm test`: 102 backend tests covering Slack events, the /directory form, the sheet sync and monthly check, card
+  images, map places and the country count, and the preload, with all outside services mocked.
+- `npm run test:browser`: 462 checks in Chromium across phones, tablet and desktop up to 2560, the Map view included,
   light and dark, reduced motion, GSAP missing, an empty index and the API being down.
   Screenshots go to `test/shots/`. It needs Playwright's Chromium (`npx playwright install chromium`)
   or `CHROMIUM_PATH`. Check on a real iPhone in Safari before launch.

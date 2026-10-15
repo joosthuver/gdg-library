@@ -1,11 +1,12 @@
 // /api/status — a plain-words setup check for the admin. Open it in a browser.
-// One line per piece (database, image storage, sheet, Slack, schedule), each ✓ or ✗ with what to do,
+// One line per piece (database, image storage, sheet, Slack, map, schedule), each ✓ or ✗ with what to do,
 // then the last few things Slack sent and what happened to them.
 // Shows only whether settings are present and working, never their values.
 
 import * as store from '../lib/store.js';
 import * as sheet from '../lib/sheet.js';
 import { call, scopes, explainSlackError } from '../lib/slack.js';
+import { placesOf, needsPlaces } from '../lib/places.js';
 
 const env = (k) => (process.env[k] || '').trim();
 const ids = (k) => env(k).split(',').map((s) => s.trim()).filter(Boolean);
@@ -79,6 +80,27 @@ async function slackForm() {
   }
 }
 
+async function map() {
+  try {
+    const live = (await withTimeout(store.all())).filter(([, e]) => !e.removedAt).map(([, e]) => e);
+    const on = live.filter((e) => (placesOf(e) || []).length).length;
+    const waiting = live.filter((e) => needsPlaces(e) && !placesOf(e)).length;
+    const off = live.filter((e) => placesOf(e) && !placesOf(e).length && e.geo.missing.length);
+    const roughly = live.filter((e) => (placesOf(e) || []).length && e.geo.missing.length);
+    const who = (list) => list.map((e) => `${e.title || e.host} (“${e.location}”)`).join(', ');
+    let text = `${on} of ${live.length} on the map.`;
+    if (waiting) text += ` ${waiting} still to look up; that happens in the background as people visit.`;
+    if (roughly.length) text += ` Shown in the middle of their country, as their city wasn’t found: ${who(roughly)}.`;
+    if (off.length) {
+      return { ok: false, text: `${text} Not on the map, as their place wasn’t found: ${who(off)}.`,
+        fix: 'In the sheet, write a city in Location (add the region if the name is common, e.g. “Portland, Maine”), or fill in Country. The map updates within 10 minutes.' };
+    }
+    return { ok: true, text };
+  } catch (err) {
+    return { ok: false, text: `Can’t check (${err.message}).` };
+  }
+}
+
 function signingSecret() {
   return need(['SLACK_SIGNING_SECRET'], 'Slack app → Basic Information → Signing Secret → Show → copy into Vercel, then redeploy.')
     || { ok: true, text: 'Set. If the activity below says a message was rejected, it doesn’t match the Slack app’s.' };
@@ -119,7 +141,7 @@ const ago = (iso) => {
 };
 
 export async function GET() {
-  const [db, sh, app, ch, fm] = await Promise.all([database(), googleSheet(), slackApp(), slackChannel(), slackForm()]);
+  const [db, sh, app, ch, fm, mp] = await Promise.all([database(), googleSheet(), slackApp(), slackChannel(), slackForm(), map()]);
   const checks = [
     ['Database', db],
     ['Image storage', images()],
@@ -129,6 +151,7 @@ export async function GET() {
     ['Slack channel', ch],
     ['Approvers', approvers()],
     ['/directory form', fm],
+    ['Map', mp],
     ['Schedule', schedule()],
   ];
   let events = [];
